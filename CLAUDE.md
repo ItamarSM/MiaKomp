@@ -452,9 +452,9 @@ MSVC tree to the other machine.
 - Open: commits carry the real email in a public repo — noreply address offered, not decided.
 - Still unanswered: *why must `build/` never be committed?* Ask again before the Mac clone.
 
-**Immediately next:** clone on the Mac, configure, build (first Mac check of `CMakeLists.txt` and of
-`.gitattributes`). Then the daily loop: pull → edit → commit → push.
+**Mac clone is deferred** — I'll say when I'm on the Mac. Then: `git clone`, configure, build (first
+Mac check of `CMakeLists.txt` and `.gitattributes`), ask the `build/` question first.
 
-**After Git:** split `reference/vm_original.cpp` into `src/vm.h` + `src/vm.cpp` (no
+**Immediately next (on Windows):** split `reference/vm_original.cpp` into `src/vm.h` + `src/vm.cpp` (no
 `main()`, no test bytecode), add `vm.cpp` to `add_executable`, and drive it from `main.cpp`.
 First real exercise in declarations vs definitions, include guards / `#pragma once`, and `LNK2019`.
