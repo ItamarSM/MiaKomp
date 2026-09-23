@@ -354,6 +354,21 @@ Review against the ladder's requirements - the "stay inside the spec" rule above
 - **Incremental builds only warn on files they recompile.** An unchanged file is skipped, so its
   warnings don't reappear. `--clean-first` forces a full recompile when the warning count matters
 
+### Git
+- Three places: **working tree** (disk) → `git add` → **staging area** (the next snapshot's draft)
+  → `git commit` → **repository** (`.git/`, every snapshot). Staging lets a commit hold only some edits
+- `git status` constantly; `git diff` = working tree vs staged; `git diff --staged` = what the next
+  commit contains — read it before every commit. `git add .` stages *everything*; name files when
+  only some changes belong in the commit
+- `.gitignore` for generated files; Git tracks files, not folders (`.gitkeep` for an empty one)
+- `.gitattributes` `* text=auto` puts the line-ending rule in the repo; `git ls-files --eol` shows
+  index (`i/`) vs working-tree (`w/`) endings
+- Commit message: ~50-char imperative summary ("Add X"), optional body after a blank line
+  (a second `-m`)
+- Remote = another copy of the same history; `origin` is the conventional name. `push -u origin main`
+  sets the upstream so plain `push`/`pull` work and `status` reports ahead/behind
+- One dash = single-letter option (`-m`), two dashes = word option (`--oneline`)
+
 ---
 
 ---
@@ -421,6 +436,24 @@ MSVC tree to the other machine.
 3. GitHub: create the repository, `remote add`, `push -u`. Then `clone` on the Mac, configure, build,
    which is also the first Mac check of `CMakeLists.txt`.
 4. The daily loop: pull → edit → commit → push.
+
+### Session 2 — 2026-09-23 — Git + GitHub, local loop working
+
+- Project now lives at `C:\dev\MiaKomp`. Old `build/` was gone after the move; reconfigure from the
+  new path.
+- `git init` on `main` (`init.defaultBranch main` set globally). `.gitignore` = `build/`, verified by
+  `git status` no longer listing it. `examples/.gitkeep` added because Git tracks files, not folders.
+- `.gitattributes` = `* text=auto`: line-ending rule lives in the repo, not in the Windows Git
+  installer's `core.autocrlf=true`. Verified with `git ls-files --eol` (every file `i/lf`, `attr/text=auto`).
+- Three commits, imperative messages, one concern each. Practised `git diff` vs `git diff --staged`
+  on removing the C4189 test local.
+- `gh auth login` (device flow), `gh repo create` → `https://github.com/ItamarSM/MiaKomp`, **public**,
+  remote `origin`, `push -u`. Verified with `git ls-remote origin` = local `main` at `bb9d82d`.
+- Open: commits carry the real email in a public repo — noreply address offered, not decided.
+- Still unanswered: *why must `build/` never be committed?* Ask again before the Mac clone.
+
+**Immediately next:** clone on the Mac, configure, build (first Mac check of `CMakeLists.txt` and of
+`.gitattributes`). Then the daily loop: pull → edit → commit → push.
 
 **After Git:** split `reference/vm_original.cpp` into `src/vm.h` + `src/vm.cpp` (no
 `main()`, no test bytecode), add `vm.cpp` to `add_executable`, and drive it from `main.cpp`.
