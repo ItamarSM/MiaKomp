@@ -3,8 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 project(MiaKomp LANGUAGES CXX)
 
 add_executable(miakomp
-               src/main.cpp
-               src/vm.cpp)
+               src/main.cpp)
 
 target_compile_features(miakomp PRIVATE cxx_std_17)
 
