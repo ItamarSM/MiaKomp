@@ -118,8 +118,8 @@ Review against the ladder's requirements - the "stay inside the spec" rule above
 - **A shipped shift-manager app** (Python + SQLite) used daily.
 - **C++ through 18 exercises** ending in a Tic-Tac-Toe with bitboards, Zobrist hashing and a
   transposition table, then the two ladder projects above.
-- **New here, all of it**: headers and translation units, the linker as a separate step and
-  `LNK2019` as a new error category, CMake, and a codebase that does not fit in one file.
+- **New here**: CMake, and a codebase that does not fit in one file. Headers, translation units
+  and the linker are already known (stated 2026-09-24, see Multi-file projects).
 
 ---
 
@@ -336,8 +336,15 @@ Review against the ladder's requirements - the "stay inside the spec" rule above
   much later
 
 ### Multi-file projects
-- Multi-file Python projects (`from module import ...`) — the concept transfers; the C++
-  mechanism (headers, translation units, linking) is still new
+- Multi-file Python projects (`from module import ...`) — the concept transfers
+- **Headers, translation units, linking — already known** (stated 2026-09-24, not taught here):
+  declaration vs definition, include guards / `#pragma once`, compiler vs linker errors (`LNK2019`
+  unresolved, `LNK2005` multiple definition), headers not listed in `add_executable`. Don't teach
+  these; just review the code that uses them
+- **Exception — default arguments across a split were *not* known** (C2572 in the VM split,
+  2026-09-24). `#include` pastes the header in, so repeating `= value` on the `.cpp` definition
+  is a second default in the same translation unit. The default must stay on the header
+  declaration because it is filled in at the *call site*, and callers only see the header
 
 ### CMake
 - CMake is a **generator**, not a compiler: `cmake -S . -B build` (configure) writes the platform's
@@ -457,4 +464,23 @@ Mac check of `CMakeLists.txt` and `.gitattributes`), ask the `build/` question f
 
 **Immediately next (on Windows):** split `reference/vm_original.cpp` into `src/vm.h` + `src/vm.cpp` (no
 `main()`, no test bytecode), add `vm.cpp` to `add_executable`, and drive it from `main.cpp`.
-First real exercise in declarations vs definitions, include guards / `#pragma once`, and `LNK2019`.
+Headers are already known (2026-09-24), so this is a mechanical split, not a lesson: do it,
+get it reviewed, move on to `token.h` and the lexer.
+
+### Session 3 — 2026-09-24 — VM split into src/vm.hpp + src/vm.cpp
+
+- Named `vm.hpp`, not `vm.h`. `Instruction`'s constructor lives in the class body in the header
+  (implicitly `inline`, so no `LNK2005`); the `VM` members are defined in `vm.cpp`.
+- Review caught, in order: `vm.cpp` missing from `add_executable` (3× `LNK2019`); that fix exposed
+  C2572 (default argument repeated on the definition — not actually known, see Multi-file
+  projects); `reference/vm_original.cpp` emptied by a cut-instead-of-copy, restored with
+  `git restore`; the test program had a `CALL` with no `RET` and exited 1 on the leak check.
+- Final test program: `JUMP` over a subroutine (`PUSH 2, MUL, RET`), `PUSH 5, CALL, PRINT`.
+  **Verified**: `--clean-first` at `/W4` = 0 warnings; output `10`, exit 0.
+- Git: committed `CLAUDE.md` into the code commit by mistake, undid it with
+  `git reset --soft HEAD~1` + `git restore --staged`, recommitted as `1604dfe`. Learned
+  `revert` (new undo commit, for pushed history) vs `reset` (move the branch, local only), and
+  `--soft` / `--mixed` / `--hard` as how many of the three places get reset. Not pushed yet.
+
+**Immediately next:** push. Then ladder #4: `src/token.h` and the lexer, reusing the shape of the
+calculator's tokenizer from `TheCompilerWay/Test.cpp`.
