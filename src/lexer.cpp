@@ -164,6 +164,56 @@ std::vector<Token> Lexer::tokenize()
                 consume();
             this->buffer.clear();
         }
+        else if (std::isdigit(static_cast<unsigned char>(peek())))
+        {
+            consume();
+            Token t;
+            while (std::isdigit(static_cast<unsigned char>(peek())))
+            {
+                consume();
+            }
+            if (peek() == '.')
+            {
+                consume();
+                t.type = TokenType::float_LIT;
+                if (!std::isdigit(static_cast<unsigned char>(peek())))
+                {
+                    throw std::runtime_error("Expected a digit");
+                }
+                else
+                {
+                    consume();
+                    while (std::isdigit(static_cast<unsigned char>(peek())))
+                    {
+                        consume();
+                    }
+                    try
+                    {
+                        t.float_val = std::stod(this->buffer);
+                    }
+                    catch (const std::out_of_range &)
+                    {
+                        throw std::runtime_error("Number too big for a double");
+                    }
+                    ret.push_back(t);
+                    this->buffer.clear();
+                }
+            }
+            else
+            {
+                t.type = TokenType::int_LIT;
+                try
+                {
+                    t.int_val = std::stoll(this->buffer);
+                }
+                catch (const std::out_of_range &)
+                {
+                    throw std::runtime_error("Number too big for a long long");
+                }
+                ret.push_back(t);
+                this->buffer.clear();
+            }
+        }
         else
         {
             throw std::runtime_error("unknown char");
