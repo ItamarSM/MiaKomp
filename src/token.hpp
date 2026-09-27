@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <cmath>
+#include <iostream>
 
 enum class TokenType
 {
@@ -51,4 +52,10 @@ struct Token
     std::string text = "";
     long long int_val = 0;
     double float_val = NAN;
+
+public:
+    void printT() const
+    {
+        std::cout << "Type: " << static_cast<int>(type) << ", Text: " << text << ", int_val: " << int_val << ", float_val: " << float_val << std::endl;
+    }
 };
