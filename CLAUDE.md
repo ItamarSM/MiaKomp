@@ -194,6 +194,9 @@ together with `docs/syntax.md` for how each feature is spelled.
 - **Const member functions**: a trailing `const` (`uint16_t getX() const`) is a compiler-enforced
   promise not to modify `*this`, and is *required* to call the method through a `const` reference
 - `enum` for named constants, e.g. `enum State{X, EMPTY, O}`
+- **`enum class`** does not convert to `int` implicitly — that is its point. `std::cout << type`
+  is C2679 (no `<<` for the type). `static_cast<int>(type)` asks for the number explicitly.
+  `static_cast` is a keyword, not `std::static_cast` (C2589)
 - `static` has three unrelated meanings by position: in a function = initialized once, persists
   across calls; in a class = one shared copy (a Python class attribute); at file scope = internal
   linkage. `static constexpr` in a function is the idiom for a build-once lookup table
@@ -210,6 +213,21 @@ together with `docs/syntax.md` for how each feature is spelled.
   and the type you assign into does *not* reach back and change the parse. Convert inside the
   expression: `std::string(1, c)` uses the `(count, char)` constructor
 - `.c_str()` — hands a `std::string`'s buffer to an API wanting a `const char*`
+- **Multi-character literals** (`'{+'`, `'\\0'`) compile. They are an `int` with an
+  implementation-defined value, not a `char`. MSVC warns only when one is *narrowed* into a
+  `char` (C4244, reported inside `<utility>` when it is a map key); compared against a `char`, it
+  is silent and simply never equal. GCC warns on both. One character between single quotes, always
+- Escapes are processed by the C++ lexer: `'\\'` is one backslash, `'\t'` is a tab, and `'t'` is
+  the letter. A lexer that decodes MiaKomp's `\t` compares against `'t'`
+- **Raw string literals** `R"(...)"`: no escape processing between `R"(` and `)"`. The readable way
+  to write MiaKomp source containing quotes and backslashes as a C++ test input. Introduced, not
+  yet used
+- `std::string` guarantees `s[s.size()] == '\0'`, so a `peek()` at exactly the end is safe and
+  returns a usable sentinel. One past that is undefined behaviour
+- `<cctype>` (`isalpha`, `isdigit`, `isalnum`, `isspace`): cast the argument,
+  `std::isalpha(static_cast<unsigned char>(c))`. A negative `char` is undefined behaviour and
+  MSVC Debug asserts on it. Cast the argument, not the result. There is no "letter or `_`"
+  function; combine with `c == '_'`
 
 ### Operators & numeric gotchas
 - Bitwise: `&` tests, `|` sets, `& ~mask` clears, `^` toggles; `|=`/`&=`/`^=` compound assignment
@@ -241,6 +259,13 @@ together with `docs/syntax.md` for how each feature is spelled.
   a variable directly under one is a compile error (C2360) unless the body is wrapped in braces
 - A range-based `for` cannot express a loop whose index moves non-linearly — it walks front to back
   and never revisits. Jumping requires a `while` over an index you control yourself
+- **`if` where `else if` was meant silently breaks a chain in two.** The trailing `else` then
+  belongs to the new `if`, so every earlier branch falls through into it. In the lexer, one
+  missing `else` made every non-string token throw "unknown char"
+- **Guard first in `&&`.** Short-circuiting runs left to right, so the check that makes the next
+  read safe (`i < size()`, `peek() == '='` before `peekAhead(1)`) must be on the left
+- A bare `f;` names a function without calling it. MSVC rejects it for a member (C3867, "use `&`
+  to create a pointer to member"); the fix is `f();`
 
 ### Bitboards, hashing, search
 - Bitboards: a `uint64_t` (or `uint16_t` for a small board) where each bit is one square;
@@ -313,6 +338,14 @@ together with `docs/syntax.md` for how each feature is spelled.
   a type with no overload doesn't fall back to anything. Use `e.what()`
 - Overload-resolution errors dump every candidate as `note:` lines. **Read the first line, ignore
   the notes** — the opposite of reading a Python traceback bottom-up
+- **A throw hands the caller nothing.** Unwinding destroys the throwing function's locals, so a
+  half-filled result vector is freed and the caller's assignment never happens. The error
+  message is the only thing that survives, so it has to carry the useful context
+- `std::out_of_range` (from `stoi`/`stoll`/`stod`) is a `logic_error`, **not** a `runtime_error`.
+  A `catch (const std::runtime_error&)` lets it through to `terminate`. Either catch
+  `const std::exception&` at the top, or catch it where it happens and re-throw a clearer error
+- `std::stoll` for a `long long` field: `stoi` rejects anything above 2147483647 even when the
+  destination could hold it
 
 ### Class mechanics
 - `= default` is a **declaration**, so it obeys the `public:`/`private:` section it sits in — a
@@ -496,3 +529,42 @@ get it reviewed, move on to `token.h` and the lexer.
 
 **Immediately next:** push. Then ladder #4: `src/token.h` and the lexer, reusing the shape of the
 calculator's tokenizer from `TheCompilerWay/Test.cpp`.
+
+### Session 4 — 2026-09-27 — Lexer complete (ladder #4, stage 1)
+
+- `src/token.hpp` (`TokenType` enum class, `Token` with `text` / `int_val` / `float_val = NAN`,
+  `printT() const`) and `src/lexer.hpp` + `src/lexer.cpp` (`Lexer(src)`, `tokenize()` returning
+  `std::vector<Token>` ending in `END`). `vm.cpp` was missing from `add_executable` since the split;
+  added with the lexer.
+- **The lexer covers everything `docs/syntax.md` lists**: keywords and identifiers, `#` comments,
+  whitespace, `int` / `float` literals, punctuation, `+ - * /`, `=`, `=? !=? <? >? <=? >=?`, and
+  strings with `\" \ \n \t`. Every error throws `std::runtime_error`; `main` catches
+  `const std::exception&`.
+- Core idea learned: **branch on the first character, scan the whole token (maximal munch), then
+  classify.** The first draft matched keywords while still accumulating characters, so `integer`
+  would lex as `int` + `eger`. Punctuation uses a `char -> TokenType` map; operators consume the
+  first character and then look ahead (`peekAhead`), longest match first.
+- Review loop for the lexer, in order: nothing returned or pushed; each char appended twice;
+  `continue` without advancing (infinite loop); comment loop `||` for `&&` and read past the end;
+  `std::static_cast`; `enum class` into `<<`; `consume;` without `()`; `isalnum` in the number
+  branch; `stoi` for a `long long`; `'{+'` as a map key; `<?` rejected and `<=` accepted; the `?`
+  of `<?` never consumed; `if` instead of `else if` hijacking the final `else`; quotes and
+  backslash leaking into string text; `'\t'` for `'t'`; `'\0'`.
+- **Verified**: `--clean-first` at `/W4` = 0 warnings. Test tables for words, numbers, operators and
+  strings all matched predictions; string sizes measured with `text.size()` (5, 0, 3, 8, 10, 8, 14).
+- `main.cpp` is now a test loop (`std::vector<std::string>` of inputs, fresh `Lexer` and its own
+  `try` per input). It currently holds only the string cases; earlier tables were run by hand and
+  not kept in it (my decision).
+- Decision recorded in `docs/syntax.md`: a string may contain a literal line break.
+- Commits: `8b6d6db` words, `214411b` numbers, `65c4dd0` operators, `7098b3f` strings, all pushed.
+- Not done, not required by the spec: the keyword `if` chain was kept rather than replaced by a
+  map; error messages carry no position.
+- Claude got the enum numbers wrong twice in predicted outputs (`make` = 5 not 13, `END` = 38 not
+  46). Count from `token.hpp`, not from a reviewer's table.
+
+**Immediately next:** the AST, `src/ast.h`, header-only type definitions. It needs `std::variant`
+(and `std::visit` for the interpreter), the content of the skipped JSON project (#2), and a
+recursive type, so expression nodes hold children through `std::unique_ptr`. Ask first whether I
+want to learn `std::variant` before explaining it. Then the parser, reviewed against
+`docs/syntax.md`; open questions 1–3 (`main`'s return type, precedence, default-parameter order)
+must be answered before it.
