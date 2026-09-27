@@ -9,15 +9,18 @@ Anything not listed here is undecided, not implied. See **Open questions** at th
 
 - The top level may contain only **declarations**: `make` and `fn`. No statements.
   `i = 9;` or `print(i);` at the top level is an error (the C++ rule).
-- `main { ... }` is the entry point, like `main` in C++. Execution starts there.
+- `main:int { ... }` is the entry point, like `int main()` in C++. Execution starts there.
+  The return type is required, as everywhere else, and `main` follows the function rules: it
+  must `RET` an `int`. That value is the program's exit code.
 - Top-level `make` variables are in the outer scope, visible to `main` and to every function.
 
 ```
 make i:int = 5;
 
-main {
+main:int {
     i = 9;
     print(i);
+    RET 0;
 }
 ```
 
@@ -46,7 +49,8 @@ count = count + 1;
 
 - `fn name(param:type, ...):returnType { ... }`. The parameter types and the return type are
   **required**. Whitespace around `:` does not matter.
-- Parameters may have defaults: `b:int = 5`.
+- Parameters may have defaults: `b:int = 5`. Parameters with defaults come **last**, as in C++:
+  `fn f(a:int = 1, b:int)` is a parse error.
 - `RET value;` returns. `RET` is uppercase.
 - A function that can reach its end without `RET` is a type-check error.
 
@@ -80,6 +84,12 @@ fn checkAddition(a:int, b:int = 5):bool {
 - `and` / `or` **short-circuit**: in `a and b`, `b` is not evaluated when `a` is false; in
   `a or b`, `b` is not evaluated when `a` is true.
 - The operands of `and`, `or` and `not` must be `bool`.
+- **Precedence**, lowest to highest: `or` < `and` < `not` < comparisons < `+ -` < `* /` <
+  unary `-`. Parentheses override it.
+- Binary operators are **left-associative**: `a - b - c` is `(a - b) - c`.
+- **Comparisons chain, as in Python**: `a <? b <? c` means `a <? b and b <? c`, with `b`
+  evaluated once, and it short-circuits like `and`. This is the one exception to
+  left-associativity: read left to right, `(a <? b) <? c` would compare a `bool` with a number.
 - `-` is always its own token. `-6` is `-` followed by `6`, and the parser handles unary minus,
   so `i-6` is subtraction.
 
@@ -116,13 +126,8 @@ fn checkAddition(a:int, b:int = 5):bool {
 
 Decide these before the stage that needs them:
 
-1. **`main`'s return type**: return types are required everywhere else. Is `main` an exception,
-   or is it `main:int {`? *(parser)*
-2. **Operator precedence**: proposed: `or` < `and` < `not` < comparisons < `+ -` < `* /` <
-   unary `-`. *(parser)*
-3. **Defaults**: must parameters with defaults come last, as in C++? *(parser)*
-4. **`int / int`**: integer division, or a `float` result? *(type checker)*
-5. **Mixing `int` and `float`**: is `1 + 2.5` legal? *(type checker)*
+1. **`int / int`**: integer division, or a `float` result? *(type checker)*
+2. **Mixing `int` and `float`**: is `1 + 2.5` legal? *(type checker)*
 
 ---
 
@@ -138,7 +143,7 @@ fn checkAddition(a:int, b:int = 5):bool {
     RET false;
 }
 
-main {
+main:int {
     i = 9;
     print(i);                               # 9
     make b:bool = checkAddition(i, -6);
@@ -147,5 +152,6 @@ main {
         print(i);                           # 9 10 11 12 13 14
         i = i + 1;
     }
+    RET 0;
 }
 ```

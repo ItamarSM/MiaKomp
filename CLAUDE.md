@@ -347,6 +347,22 @@ together with `docs/syntax.md` for how each feature is spelled.
 - `std::stoll` for a `long long` field: `stoi` rejects anything above 2147483647 even when the
   destination could hold it
 
+### `std::variant` (2026-09-28, the content of the skipped JSON project)
+- `std::variant<int, double, bool, std::string>`: exactly one of the listed types at a time, and it
+  knows which. Python's `Union[...]`, enforced by the compiler
+- `v.index()`, `std::holds_alternative<T>(v)`, `std::get<T>(v)` (throws
+  `std::bad_variant_access`), `std::get_if<T>(&v)` (pointer or `nullptr`, never throws)
+- `std::visit(f, v)` calls `f` with the held value at its real type. `f` is any **callable
+  object**: a struct with one `operator()` per alternative (Python's `__call__`, plus
+  overloading). An overload set of plain functions can't be passed by name, an object can
+- Every alternative must have a matching overload or it **does not compile**, even if that type
+  is never held at runtime. A `double` with only `int` and `bool` overloads is ambiguous, not
+  converted. The error surfaces inside `<variant>` (C2672 `std::invoke`); read the first error,
+  then the `message` line naming the type (`_Ty1=double &`) and the one naming your own file
+- Size = the **largest** alternative + the index, padded to alignment: 40 (`std::string`, MSVC
+  Debug) + 1 → 48. The alternatives share the storage; no heap
+- **Smart pointers (`std::unique_ptr`) — already known** (stated 2026-09-28, not taught here)
+
 ### Class mechanics
 - `= default` is a **declaration**, so it obeys the `public:`/`private:` section it sits in — a
   private default constructor makes the class un-instantiable (C2248). Also: you only need it when
@@ -591,9 +607,44 @@ calculator's tokenizer from `TheCompilerWay/Test.cpp`.
   `ifstream` strips Windows' `\r`. Each error file and a missing file exit 1 with their own message.
 - Commit `bfc3f1b`, pushed.
 
-**Immediately next:** the AST, `src/ast.h`, header-only type definitions. It needs `std::variant`
-(and `std::visit` for the interpreter), the content of the skipped JSON project (#2), and a
-recursive type, so expression nodes hold children through `std::unique_ptr`. Ask first whether I
-want to learn `std::variant` before explaining it. Then the parser, reviewed against
-`docs/syntax.md`; open questions 1–3 (`main`'s return type, precedence, default-parameter order)
-must be answered before it.
+### Session 6 — 2026-09-28 — Spec decisions, `std::variant`, AST started
+
+- **Parser questions answered** and recorded in `docs/syntax.md`: `main:int { ... }` (must `RET`
+  an `int`, which is the exit code; Claude's inference, flagged, not contradicted); precedence
+  `or` < `and` < `not` < comparisons < `+ -` < `* /` < unary `-`; defaults come last; binary
+  operators left-associative; **comparisons chain as in Python** (`a <? b <? c` =
+  `a <? b and b <? c`, `b` evaluated once, short-circuits). Open now: only the two type-checker
+  questions (`int / int`, mixing `int` and `float`).
+- `std::variant` learned with a throwaway `varient.cpp` outside the repo (in `Begginer
+  projects/C++/`). Stumbled on `std::visit(Printer{}, v)` ("`Printer{}` isn't a function"):
+  it's a callable object. First exercise version didn't compile (no `double` overload); fixed.
+  `sizeof` 48 explained as largest alternative + index + padding. See the `std::variant` section.
+- `unique_ptr` stated as already known.
+- **`src/ast.hpp` in progress, not committed.** Done: `BinaryOp` / `CompareOp` / `UnaryOp` enums
+  (first draft had one `Op` enum listing the *categories*), `Type` enum, `Expr` forward-declared →
+  nine node structs → `struct Expr { variant<...> kind; }` (second draft defined `Expr` first:
+  C2065). Taught rule: **by value needs the full definition; through a pointer, a forward
+  declaration is enough** (tied to the variant `sizeof` lesson).
+- Design decisions: AST has its own operator enums, not `TokenType`; `Compare` is a chain
+  (operands list + ops list), not nested `Binary`, so the middle operand exists once;
+  `Param`'s default is a nullable `unique_ptr<Expr>`; `main`'s return type is not stored.
+- I said "I don't really understand" about the outline; offered to explain either the variant
+  wrapper or pointer-vs-value, no answer yet. Ask again next session.
+
+**Immediately next — finish `src/ast.hpp`:**
+1. Literals regressed to `unique_ptr<Expr>` in the last draft; they are leaves and hold their value
+   (`long long`, `double`, `bool`, `std::string`) as in the draft before.
+2. `If` / `While` bodies must hold `Stmt`, not `ExprStmt` (open choice: `vector<Stmt>` vs
+   `vector<unique_ptr<Stmt>>`, and why it compiles). `Ret` must come before `Stmt` and be in its
+   variant.
+3. `Param::value` is still `variant<...> = nullptr`; should be `std::unique_ptr<Expr>`.
+4. Write `FnDecl` (name, params, return type, body) and `Program` (global `Make`s, `FnDecl`s,
+   `main` body).
+5. `#include "ast.hpp"` in `main.cpp` — until then the build never compiles the header (Claude
+   checked it through a scratch file).
+6. Verify: build `1 + 2 * 3` and `a <? b <? c` by hand with `std::make_unique` / `std::move`, print
+   with a visitor, predict `(1 + (2 * 3))` and `(a <? b <? c)` first. Clean `/W4`.
+
+Then the parser, reviewed against `docs/syntax.md`.
+
+Uncommitted at session end: `CLAUDE.md`, `docs/syntax.md`, `src/ast.hpp`.
