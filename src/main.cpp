@@ -6,8 +6,8 @@
 void printUsage()
 {
     std::cout << "Usage:\n"
-                 "For a Debug run- './build/Debug/miakomp <filename>.miak\n"
-                 "For a Real run - './build/Release/miakomp <filename>.miak\n";
+                 "For a Debug run- './build/Debug/miakomp <filename>.miak'\n"
+                 "For a Real run - './build/Release/miakomp <filename>.miak'\n";
 
     exit(EXIT_FAILURE);
 }

@@ -366,6 +366,13 @@ together with `docs/syntax.md` for how each feature is spelled.
   Pure C++ grammar ambiguity, no Python analogue
 
 ### Streams & input
+- **Command-line arguments**: `int main(int argc, char* argv[])`; `argv[0]` is the program name,
+  as in Python's `sys.argv`. Relative paths resolve against the working directory, not the exe's
+- Whole file into a string: `std::ifstream` (`<fstream>`), check `if (!file)`, then
+  `ss << file.rdbuf()` into a `std::ostringstream` (`<sstream>`). Text mode turns Windows `\r\n`
+  into `\n`, the way Python's `open()` does; `std::ios::binary` would not
+- **A same-named declaration in an inner scope hides the outer variable** instead of assigning it.
+  MSVC C4456 at `/W4`. Python has no block scope, so it has no equivalent
 - `while (std::getline(std::cin, line))` — the stream converts to `bool`, so the read *is* the loop
   condition. One call, not a test-read plus a real read. Without it, EOF stops blocking and the
   loop spins forever
@@ -561,6 +568,28 @@ calculator's tokenizer from `TheCompilerWay/Test.cpp`.
   map; error messages carry no position.
 - Claude got the enum numbers wrong twice in predicted outputs (`make` = 5 not 13, `END` = 38 not
   46). Count from `token.hpp`, not from a reviewer's table.
+
+### Session 5 — 2026-09-27 — File input (`.miak` files)
+
+- Not a ladder requirement; my choice, done before the AST so tests are real `.miak` files instead
+  of C++ string literals with double escaping.
+- `main(int argc, char* argv[])`, usage message when `argc != 2`. `readFile(const std::string&)`
+  opens a `std::ifstream`, throws `std::runtime_error` naming the path if it fails, and reads the
+  whole file via `ss << file.rdbuf()` into a `std::ostringstream` (not `getline`, which drops the
+  newlines the lexer needs).
+- Bug: `std::string sourceCode = readFile(...)` inside the `try` declared a **new** variable that
+  shadowed the outer one and died at the brace, so the lexer got an empty string and printed only
+  `END`. `/W4` reports it as **C4456**, but only on `--clean-first` — the incremental build had
+  skipped it again.
+- A file stops at its first throw, and the tokens lexed before it are lost with `tokenize()`'s
+  locals. Error cases are therefore one per file: `examples/err_unterminated.miak`,
+  `err_unterminated_escape.miak`, `err_bad_escape.miak`. Putting them together changed their
+  meaning: since strings may span lines, `"abc⏎"abc\"` lexed as a string then `abc` then `\`
+  ("unknown char").
+- **Verified**: clean `/W4` build, 0 warnings. `strings.miak` exits 0 with sizes 5, 0, 3, 8, 10, 8,
+  14 (same as the Session 4 table). A string with a line break is size 4, not 5, so text-mode
+  `ifstream` strips Windows' `\r`. Each error file and a missing file exit 1 with their own message.
+- Commit `bfc3f1b`, pushed.
 
 **Immediately next:** the AST, `src/ast.h`, header-only type definitions. It needs `std::variant`
 (and `std::visit` for the interpreter), the content of the skipped JSON project (#2), and a
