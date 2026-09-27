@@ -10,6 +10,11 @@ char Lexer::peek()
     return this->src[this->i];
 }
 
+char Lexer::peekAhead(int c)
+{
+    return this->src[this->i + c];
+}
+
 void Lexer::consume()
 {
     this->buffer += this->src[this->i];
@@ -212,6 +217,104 @@ std::vector<Token> Lexer::tokenize()
                 }
                 ret.push_back(t);
                 this->buffer.clear();
+            }
+        }
+        else if (this->opMap.find(peek()) != this->opMap.end())
+        {
+            Token t;
+            t.type = this->opMap[peek()];
+            consume();
+            this->buffer.clear();
+            ret.push_back(t);
+        }
+        else if (peek() == '=')
+        {
+            Token t;
+            consume();
+            if (peek() == '?')
+            {
+                consume();
+                t.type = TokenType::EQ_COMP;
+                ret.push_back(t);
+                this->buffer.clear();
+            }
+            else
+            {
+                t.type = TokenType::EQ_OP;
+                ret.push_back(t);
+                this->buffer.clear();
+            }
+        }
+        else if (peek() == '!')
+        {
+            Token t;
+            consume();
+            if (peek() == '=')
+            {
+                consume();
+                if (peek() == '?')
+                {
+                    consume();
+                    t.type = TokenType::NOT_COMP;
+                    ret.push_back(t);
+                    this->buffer.clear();
+                }
+                else
+                {
+                    throw std::runtime_error("'!=' invalid operator");
+                }
+            }
+            else
+            {
+                throw std::runtime_error("Wrong use of !");
+            }
+        }
+        else if (peek() == '<')
+        {
+            Token t;
+            consume();
+            if (peek() == '=' && peekAhead(1) == '?')
+            {
+                consume();
+                consume();
+                t.type = TokenType::LTEQ_COMP;
+                ret.push_back(t);
+                this->buffer.clear();
+            }
+            else if (peek() == '?')
+            {
+                consume();
+                t.type = TokenType::LT_COMP;
+                ret.push_back(t);
+                this->buffer.clear();
+            }
+            else
+            {
+                throw std::runtime_error("Wrong use of <");
+            }
+        }
+        else if (peek() == '>')
+        {
+            Token t;
+            consume();
+            if (peek() == '=' && peekAhead(1) == '?')
+            {
+                consume();
+                consume();
+                t.type = TokenType::GTEQ_COMP;
+                ret.push_back(t);
+                this->buffer.clear();
+            }
+            else if (peek() == '?')
+            {
+                consume();
+                t.type = TokenType::GT_COMP;
+                ret.push_back(t);
+                this->buffer.clear();
+            }
+            else
+            {
+                throw std::runtime_error("Wrong use of >");
             }
         }
         else

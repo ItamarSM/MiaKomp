@@ -3,20 +3,24 @@
 
 int main()
 {
-    Lexer lex("99999999999999999999");
-    std::vector<Token> tokenList;
-    try
+    std::vector<std::string> cases = {"<", ">", "!", "!=", "<="};
+    for (std::string s : cases)
     {
-        tokenList = lex.tokenize();
+        Lexer lex(s);
+        std::vector<Token> tokenList;
+        try
+        {
+            tokenList = lex.tokenize();
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << e.what() << "\n";
+        }
+        for (const auto &t : tokenList)
+        {
+            t.printT();
+        }
     }
-    catch (const std::exception &e)
-    {
-        std::cerr << e.what() << "\n";
-        return EXIT_FAILURE;
-    }
-    for (const auto &t : tokenList)
-    {
-        t.printT();
-    }
+
     return 0;
 }
