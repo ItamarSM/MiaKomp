@@ -317,6 +317,63 @@ std::vector<Token> Lexer::tokenize()
                 throw std::runtime_error("Wrong use of >");
             }
         }
+        else if (peek() == '"')
+        {
+            i++;
+            while (true)
+            {
+                if (peek() == '\0')
+                {
+                    throw std::runtime_error("Unterminated string");
+                }
+                else if (peek() == '"')
+                {
+                    i++;
+                    break;
+                }
+                else if (peek() == '\\')
+                {
+                    i++;
+                    if (peek() == '"')
+                    {
+                        this->buffer.append("\"");
+                        i++;
+                    }
+                    else if (peek() == '\\')
+                    {
+                        this->buffer.append("\\");
+                        i++;
+                    }
+                    else if (peek() == 'n')
+                    {
+                        this->buffer.append("\n");
+                        i++;
+                    }
+                    else if (peek() == 't')
+                    {
+                        this->buffer.append("\t");
+                        i++;
+                    }
+                    else if (peek() == '\0')
+                    {
+                        throw std::runtime_error("Unterminated string");
+                    }
+                    else
+                    {
+                        throw std::runtime_error("Invalid escape");
+                    }
+                }
+                else
+                {
+                    consume();
+                }
+            }
+            Token t;
+            t.type = TokenType::string_LIT;
+            t.text = this->buffer;
+            this->buffer.clear();
+            ret.push_back(t);
+        }
         else
         {
             throw std::runtime_error("unknown char");
