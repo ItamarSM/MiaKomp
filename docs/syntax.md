@@ -90,7 +90,8 @@ fn checkAddition(a:int, b:int = 5):bool {
   `.5` are errors.
 - **bool**: `true`, `false`
 - **string**: `"..."`. Supported escapes: `\"` `\\` `\n` `\t`. Any other escape is an error.
-  An unterminated string is an error.
+  An unterminated string is an error. A string may span lines: a literal line break between the
+  quotes is part of the value.
 
 ## Printing
 
