@@ -1,0 +1,8 @@
+"hello"
+""
+"a\nb"
+"say \"hi\""
+"back\\slash"
+"tab\there"
+"#not a comment"
+make s:string = "x";
