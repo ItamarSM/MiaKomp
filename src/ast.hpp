@@ -35,19 +35,19 @@ struct Expr;
 
 struct IntLit
 {
-    std::unique_ptr<Expr> value;
+    long long value;
 };
 struct FloatLit
 {
-    std::unique_ptr<Expr> value;
+    double value;
 };
 struct BoolLit
 {
-    std::unique_ptr<Expr> value;
+    bool value;
 };
 struct StringLit
 {
-    std::unique_ptr<Expr> value;
+    std::string value;
 };
 struct Var
 {
@@ -101,43 +101,43 @@ struct Make
 {
     std::string name;
     Type type;
-    Expr value;
+    std::unique_ptr<Expr> value;
 };
 
 struct Assign
 {
     std::string name;
-    Expr value;
+    std::unique_ptr<Expr> value;
 };
 
 struct Stmt;
 
 struct ExprStmt
 {
-    Expr expr;
+    std::unique_ptr<Expr> expr;
 };
 
 struct If
 {
     Expr condition;
-    std::vector<ExprStmt> body;
-    std::vector<ExprStmt> elseBody;
+    std::vector<std::unique_ptr<Stmt>> body;
+    std::vector<std::unique_ptr<Stmt>> elseBody;
 };
 
 struct While
 {
     Expr condition;
-    std::vector<ExprStmt> body;
-};
-
-struct Stmt
-{
-    std::variant<Make, Assign, ExprStmt, If, While> stmt;
+    std::vector<std::unique_ptr<Stmt>> body;
 };
 
 struct Ret
 {
     Expr value;
+};
+
+struct Stmt
+{
+    std::variant<Make, Assign, ExprStmt, If, While, Ret> stmt;
 };
 
 struct Param

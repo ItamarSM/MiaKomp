@@ -1,5 +1,6 @@
 #include <iostream>
 #include "lexer.hpp"
+#include "ast.hpp"
 #include <fstream>
 #include <sstream>
 
@@ -44,6 +45,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    /*
     Lexer lex(sourceCode);
     std::vector<Token> tokenList;
     try
@@ -60,6 +62,16 @@ int main(int argc, char *argv[])
         t.printT();
         std::cout << "size: " << t.text.size() << std::endl;
     }
+    */
+
+    IntLit i;
+    i.value = 5;
+
+    Expr expression;
+    expression.kind = i;
+
+    auto v = std::get<IntLit>(expression.kind);
+    std::cout << v.value << "\n";
 
     return 0;
 }
