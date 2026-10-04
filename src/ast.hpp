@@ -144,5 +144,20 @@ struct Param
 {
     std::string name;
     Type type;
-    std::variant<long long, double, bool, std::string> value = nullptr;
+    std::unique_ptr<Expr> value = nullptr;
+};
+
+struct FnDecl
+{
+    std::string name;
+    std::vector<Param> params;
+    Type retType;
+    std::vector<std::unique_ptr<Stmt>> body;
+};
+
+struct Program
+{
+    std::vector<Make> globals;
+    std::vector<FnDecl> funcs;
+    std::vector<std::unique_ptr<Stmt>> mainFunc;
 };
