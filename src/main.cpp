@@ -1,6 +1,7 @@
 #include <iostream>
 #include "lexer.hpp"
 #include "ast.hpp"
+#include "parser.hpp"
 #include <fstream>
 #include <sstream>
 
@@ -71,22 +72,22 @@ std::string compareToString(const CompareOp &e)
     switch (e)
     {
     case CompareOp::EQ:
-        return "=?";
+        return " =? ";
         break;
     case CompareOp::GT:
-        return ">?";
+        return " >? ";
         break;
     case CompareOp::GTEQ:
-        return ">=?";
+        return " >=? ";
         break;
     case CompareOp::LT:
-        return "<?";
+        return " <? ";
         break;
     case CompareOp::LTEQ:
-        return "<=?";
+        return " <=? ";
         break;
     case CompareOp::NOTEQ:
-        return "!=?";
+        return " !=? ";
         break;
     };
     throw std::runtime_error("no such op");
@@ -97,7 +98,7 @@ class Printer
 public:
     void operator()(const IntLit &e) { std::cout << e.value; }
     void operator()(const FloatLit &e) { std::cout << e.value; }
-    void operator()(const BoolLit &e) { std::cout << e.value; }
+    void operator()(const BoolLit &e) { std::cout << (e.value == true ? "true" : "false"); }
     void operator()(const StringLit &e) { std::cout << e.value; }
     void operator()(const Var &e) { std::cout << e.name; }
     void operator()(const Unary &e)
@@ -155,8 +156,6 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    /*
-
     Lexer lex(sourceCode);
     std::vector<Token> tokenList;
     try
@@ -168,12 +167,27 @@ int main(int argc, char *argv[])
         std::cerr << e.what() << "\n";
         return EXIT_FAILURE;
     }
+    /*
     for (const auto &t : tokenList)
     {
         t.printT();
         std::cout << "size: " << t.text.size() << std::endl;
     }
     */
+
+    Parser parser(tokenList);
+    std::unique_ptr<Expr> prog;
+    try
+    {
+        prog = parser.parseExpr();
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << "\n";
+        return EXIT_FAILURE;
+    }
+
+    std::visit(Printer{}, prog->kind);
 
     /*
 
@@ -193,8 +207,7 @@ int main(int argc, char *argv[])
     top->kind = Binary{BinaryOp::ADD, std::move(one), std::move(right)};
 
     std::visit(Printer{}, top->kind);
-
-    */
+    std::cout << "\n";
 
     auto a = std::make_unique<Expr>();
     a->kind = Var{"a"};
@@ -219,6 +232,8 @@ int main(int argc, char *argv[])
 
     std::visit(Printer{}, compare->kind);
     std::cout << "\n";
+
+    */
 
     return 0;
 }

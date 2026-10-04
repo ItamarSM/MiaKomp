@@ -5,7 +5,8 @@ project(MiaKomp LANGUAGES CXX)
 add_executable(miakomp
                src/main.cpp
                src/vm.cpp
-               src/lexer.cpp)
+               src/lexer.cpp
+               src/parser.cpp)
 
 target_compile_features(miakomp PRIVATE cxx_std_17)
 

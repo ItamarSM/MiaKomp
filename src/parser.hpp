@@ -1,0 +1,22 @@
+#pragma once
+
+#include "token.hpp"
+#include "ast.hpp"
+
+class Parser
+{
+public:
+    Parser(std::vector<Token> tokens);
+    std::unique_ptr<Expr> parseExpr();
+
+private:
+    const Token &peek();
+    const Token &advance();
+    bool check(TokenType type) const;
+    void expect(TokenType type, std::string message);
+    std::unique_ptr<Expr> parsePrimary();
+
+private:
+    const std::vector<Token> tokens;
+    int pos = 0;
+};
