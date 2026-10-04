@@ -363,6 +363,32 @@ together with `docs/syntax.md` for how each feature is spelled.
   Debug) + 1 → 48. The alternatives share the storage; no heap
 - **Smart pointers (`std::unique_ptr`) — already known** (stated 2026-09-28, not taught here)
 
+### Recursive variant trees (2026-10-04, the AST printer)
+- A node of a variant tree is built in two steps: `auto n = std::make_unique<Expr>();` then
+  `n->kind = IntLit{1};`. Assigning into a variant switches it to that alternative. A leaf type
+  (`IntLit`) is **not** an `Expr` — no inheritance, the variant is the only link — so
+  `unique_ptr<IntLit>` into a `unique_ptr<Expr>` field is C2679
+- A struct holding a `unique_ptr` is itself non-copyable: `kind = b;` is C2280. Move it, or
+  brace-init a temporary in place (`Binary{op, std::move(l), std::move(r)}`), which moves on its own
+- `std::visit` takes the **variant**, not the pointer to the struct holding it: `top->kind`, not
+  `top` (C2672)
+- **A recursive visitor**: an `operator()` for a node with children calls `std::visit` on each
+  child's `kind`, passing a printer (`Printer{}` or `*this`). Leaves end the recursion. `this` is a
+  `Printer*`, and a pointer is not callable (C2672)
+- `std::visit` returns what the overload returns; `std::cout << std::visit(...)` on `void`
+  overloads doesn't compile. The child prints itself; visit as its own statement
+- Through a `const T&`, everything reached is `const`, including vector elements: the loop
+  variable is `const std::unique_ptr<Expr>&` (C2440 otherwise). By value is a copy of a
+  `unique_ptr`: deleted
+- **A default-constructed `unique_ptr` is null**, and `p->x` on it is undefined behaviour, not a
+  Python `AttributeError`. It owns something only after `std::make_unique`
+- **A moved-from `unique_ptr` is null too, and the compiler never says so.** Moving `two` into one
+  tree and again into a second compiled clean at `/W4` and crashed (exit 139, segfault, no message).
+  A node belongs to exactly one tree; each test builds its own leaves
+- **MSVC does not warn on an unhandled `enum class` case, even at `/W4`** (C4061/C4062 are off by
+  default). GCC/Clang `-Wall` includes `-Wswitch` and would. A `throw` after the `switch` turns a
+  missed case into a loud runtime error instead of a silent one
+
 ### Class mechanics
 - `= default` is a **declaration**, so it obeys the `public:`/`private:` section it sits in — a
   private default constructor makes the class un-instantiable (C2248). Also: you only need it when
@@ -443,6 +469,9 @@ together with `docs/syntax.md` for how each feature is spelled.
 - Remote = another copy of the same history; `origin` is the conventional name. `push -u origin main`
   sets the upstream so plain `push`/`pull` work and `status` reports ahead/behind
 - One dash = single-letter option (`-m`), two dashes = word option (`--oneline`)
+- Long `git diff` output opens in the **pager** (`less`): `Space`/`b` page, arrows or `j`/`k` line,
+  `/text` search (`n`/`N`), `g`/`G` top/bottom, **`q` quits**. `git diff --stat` for an overview,
+  `git diff <file>` for one file, `git --no-pager diff` (option before the subcommand) to skip it
 
 ---
 
@@ -648,3 +677,41 @@ calculator's tokenizer from `TheCompilerWay/Test.cpp`.
 Then the parser, reviewed against `docs/syntax.md`.
 
 Uncommitted at session end: `CLAUDE.md`, `docs/syntax.md`, `src/ast.hpp`.
+
+### Session 7 — 2026-10-04 — AST finished, expression printer
+
+- The Session 6 "immediately next" list was mostly done between sessions (commits `0e36edf`,
+  `74687cd`): literals hold values, `If`/`While` bodies are `vector<unique_ptr<Stmt>>`, `Ret` is in
+  the `Stmt` variant, `Param::value` is `unique_ptr<Expr>`, `FnDecl` and `Program` exist, and
+  `main.cpp` includes `ast.hpp`.
+- `docs/syntax.md`: a parameter default is **any expression**, not only a literal. New open
+  question 3: is a default evaluated once at definition (Python) or on every call that omits it
+  (C++), and in which scope? Only visible when it reads a variable. *(interpreter)*
+- **`Printer` visitor in `main.cpp`**: one `operator()` per `Expr` alternative, recursing with
+  `std::visit(Printer{}, child->kind)`. `binaryToString` / `unaryToString` / `compareToString`
+  switch over the op enums and return MiaKomp spellings (`and`, `or`, `-`, `not `, `=?`, `<?`, ...),
+  with a `throw` after the switch. `Binary` prints one pair of parentheses per node; `Compare`
+  interleaves operands and ops with an index loop inside one pair.
+- Review loop, in order: `<<` on `enum class` and on a variant; `unique_ptr` copied in a range-`for`;
+  `CompareOp`s looped as `Expr`s; `visit(this, ...)`; `cout << visit(...)` on `void`; non-const
+  reference to a const element; null `unique_ptr<IntLit>` instead of `make_unique<Expr>`; same
+  variable assigned three times; `top.op` uninitialised; `visit(..., top)` for `top->kind`;
+  `AND`/`OR` missing from the switch (silent at `/W4`); C++ spellings (`==`, `&`, `negative`)
+  instead of MiaKomp's; parentheses around each child instead of each node; **leaves moved into
+  two trees, segfault with a clean build**.
+- **Verified**: `--clean-first` at `/W4` = 0 warnings. `a <? b <? c` built by hand prints
+  `(a<?b<?c)`, exit 0. `1 + 2 * 3` printed the right *shape* (ADD on top, MUL as its right child)
+  in the earlier multi-line format.
+- Commit `2e0becb` ("Add token printer"; it is the AST printer). Not pushed: `main` is 2 ahead.
+
+**Not done in step 6, committed as is:**
+- The `1 + 2 * 3` test is commented out, so the final `Binary` format has never run. Predicted
+  output `(1+(2*3))`.
+- No spaces around ops: `a and b` would print `(aandb)`. Target: `(1 + (2 * 3))`, `(a <? b <? c)`.
+
+Still unanswered from Session 6: I said I didn't understand the AST outline; the offer to explain
+the variant wrapper or pointer vs value stands.
+
+**Immediately next:** the two items above (spaces around ops, run both tests), push. Then the
+**parser**, reviewed against `docs/syntax.md`: tokens in, `Program` out, precedence and chained
+comparisons as recorded there. Name and outline it at the start of next session.

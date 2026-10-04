@@ -51,6 +51,7 @@ count = count + 1;
   **required**. Whitespace around `:` does not matter.
 - Parameters may have defaults: `b:int = 5`. Parameters with defaults come **last**, as in C++:
   `fn f(a:int = 1, b:int)` is a parse error.
+- A default is **any expression**, not only a literal: `b:int = -5`, `b:int = 2 * 3`, `b:int = x`.
 - `RET value;` returns. `RET` is uppercase.
 - A function that can reach its end without `RET` is a type-check error.
 
@@ -128,6 +129,9 @@ Decide these before the stage that needs them:
 
 1. **`int / int`**: integer division, or a `float` result? *(type checker)*
 2. **Mixing `int` and `float`**: is `1 + 2.5` legal? *(type checker)*
+3. **When a default is evaluated**, and in which scope its names resolve: once when the function
+   is defined (Python) or on every call that omits the argument (C++)? Only visible when the default
+   reads a variable, e.g. `b:int = x`. *(interpreter)*
 
 ---
 
