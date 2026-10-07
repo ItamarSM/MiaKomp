@@ -56,7 +56,42 @@ std::unique_ptr<Expr> Parser::parsePrimary()
         val->kind = BoolLit{tok.type == TokenType::true_KW ? true : false};
         return val;
     }
+    else if (tok.type == TokenType::IDENT)
+    {
+        std::string name = tok.text;
+        if (peek().type != TokenType::PARAN_OPEN)
+        {
+            auto var = std::make_unique<Expr>();
+            var->kind = Var{name};
+            return var;
+        }
+        advance();
+        std::vector<std::unique_ptr<Expr>> args;
+        if (peek().type == TokenType::PARAN_CLOSE)
+        {
+            auto func = std::make_unique<Expr>();
+            func->kind = Call{name, std::move(args)};
+            advance();
+            return func;
+        }
+        args.push_back(this->parseOne());
+        while (peek().type == TokenType::COMMA)
+        {
+            advance();
+            args.push_back(this->parseOne());
+        }
+        expect(TokenType::PARAN_CLOSE, "Expected ')'");
+        auto fn = std::make_unique<Expr>();
+        fn->kind = Call{name, std::move(args)};
+        return fn;
+    }
     throw std::runtime_error("Expected a value, got" + tok.text);
+}
+
+std::unique_ptr<Expr> Parser::parseOne()
+{
+    auto var = parsePrimary();
+    return var;
 }
 
 std::unique_ptr<Expr> Parser::parseExpr()

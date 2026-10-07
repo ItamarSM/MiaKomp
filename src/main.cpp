@@ -130,9 +130,13 @@ public:
     void operator()(const Call &e)
     {
         std::cout << "Call, name : " << e.name << "\n";
+        int i = 0;
         for (const std::unique_ptr<Expr> &arg : e.args)
         {
+            std::cout << "arg " << i << ": ";
             std::visit(Printer{}, arg->kind);
+            std::cout << "\n";
+            i++;
         }
     }
 };

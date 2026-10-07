@@ -14,7 +14,9 @@ private:
     const Token &advance();
     bool check(TokenType type) const;
     void expect(TokenType type, std::string message);
+
     std::unique_ptr<Expr> parsePrimary();
+    std::unique_ptr<Expr> parseOne();
 
 private:
     const std::vector<Token> tokens;
