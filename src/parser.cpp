@@ -131,9 +131,33 @@ std::unique_ptr<Expr> Parser::parseMul()
     return left;
 }
 
+std::unique_ptr<Expr> Parser::parseAdd()
+{
+    auto left = parseMul();
+    while (peek().type == TokenType::PLUS_OP || peek().type == TokenType::SUB_OP)
+    {
+        auto type = advance().type;
+        if (type == TokenType::PLUS_OP)
+        {
+            auto right = parseMul();
+            auto expr = std::make_unique<Expr>();
+            expr->kind = Binary{BinaryOp::ADD, std::move(left), std::move(right)};
+            left = std::move(expr);
+        }
+        else if (type == TokenType::SUB_OP)
+        {
+            auto right = parseMul();
+            auto expr = std::make_unique<Expr>();
+            expr->kind = Binary{BinaryOp::SUB, std::move(left), std::move(right)};
+            left = std::move(expr);
+        }
+    }
+    return left;
+}
+
 std::unique_ptr<Expr> Parser::parseOne()
 {
-    auto var = parseMul();
+    auto var = parseAdd();
     return var;
 }
 
