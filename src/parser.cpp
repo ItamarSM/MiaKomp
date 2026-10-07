@@ -155,9 +155,59 @@ std::unique_ptr<Expr> Parser::parseAdd()
     return left;
 }
 
+std::unique_ptr<Expr> Parser::parseCompare()
+{
+    auto first = parseAdd();
+    auto type = peek().type;
+    if (type == TokenType::GT_COMP || type == TokenType::GTEQ_COMP || type == TokenType::LT_COMP || type == TokenType::LTEQ_COMP || type == TokenType::EQ_COMP || type == TokenType::NOT_COMP)
+    {
+        std::vector<std::unique_ptr<Expr>> operands;
+        std::vector<CompareOp> ops;
+        operands.push_back(std::move(first));
+        do
+        {
+            advance();
+            if (type == TokenType::GT_COMP)
+            {
+                ops.push_back(CompareOp::GT);
+            }
+            else if (type == TokenType::GTEQ_COMP)
+            {
+                ops.push_back(CompareOp::GTEQ);
+            }
+            else if (type == TokenType::LT_COMP)
+            {
+                ops.push_back(CompareOp::LT);
+            }
+            else if (type == TokenType::LTEQ_COMP)
+            {
+                ops.push_back(CompareOp::LTEQ);
+            }
+            else if (type == TokenType::EQ_COMP)
+            {
+                ops.push_back(CompareOp::EQ);
+            }
+            else if (type == TokenType::NOT_COMP)
+            {
+                ops.push_back(CompareOp::NOTEQ);
+            }
+            operands.push_back(parseAdd());
+            type = peek().type;
+
+        } while (type == TokenType::GT_COMP || type == TokenType::GTEQ_COMP || type == TokenType::LT_COMP || type == TokenType::LTEQ_COMP || type == TokenType::EQ_COMP || type == TokenType::NOT_COMP);
+        auto expr = std::make_unique<Expr>();
+        expr->kind = Compare{std::move(operands), ops};
+        return expr;
+    }
+    else
+    {
+        return first;
+    }
+}
+
 std::unique_ptr<Expr> Parser::parseOne()
 {
-    auto var = parseAdd();
+    auto var = parseCompare();
     return var;
 }
 
