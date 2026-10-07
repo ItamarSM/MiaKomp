@@ -17,6 +17,7 @@ private:
 
     std::unique_ptr<Expr> parsePrimary();
     std::unique_ptr<Expr> parseUnary();
+    std::unique_ptr<Expr> parseMul();
     std::unique_ptr<Expr> parseOne();
 
 private:
