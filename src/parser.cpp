@@ -85,18 +85,37 @@ std::unique_ptr<Expr> Parser::parsePrimary()
         fn->kind = Call{name, std::move(args)};
         return fn;
     }
+    else if (tok.type == TokenType::PARAN_OPEN)
+    {
+        auto var = parseOne();
+        expect(TokenType::PARAN_CLOSE, "Expected ')'");
+        return var;
+    }
     throw std::runtime_error("Expected a value, got" + tok.text);
+}
+
+std::unique_ptr<Expr> Parser::parseUnary()
+{
+    if (peek().type == TokenType::SUB_OP)
+    {
+        advance();
+        auto var = parseUnary();
+        auto neg = std::make_unique<Expr>();
+        neg->kind = Unary{UnaryOp::NEG, std::move(var)};
+        return neg;
+    }
+    return parsePrimary();
 }
 
 std::unique_ptr<Expr> Parser::parseOne()
 {
-    auto var = parsePrimary();
+    auto var = parseUnary();
     return var;
 }
 
 std::unique_ptr<Expr> Parser::parseExpr()
 {
-    auto var = parsePrimary();
+    auto var = parseOne();
     expect(TokenType::END, "Expected the file to end");
     return var;
 }

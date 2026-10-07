@@ -16,6 +16,7 @@ private:
     void expect(TokenType type, std::string message);
 
     std::unique_ptr<Expr> parsePrimary();
+    std::unique_ptr<Expr> parseUnary();
     std::unique_ptr<Expr> parseOne();
 
 private:
