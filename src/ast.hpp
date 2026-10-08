@@ -119,20 +119,20 @@ struct ExprStmt
 
 struct If
 {
-    Expr condition;
+    std::unique_ptr<Expr> condition;
     std::vector<std::unique_ptr<Stmt>> body;
     std::vector<std::unique_ptr<Stmt>> elseBody;
 };
 
 struct While
 {
-    Expr condition;
+    std::unique_ptr<Expr> condition;
     std::vector<std::unique_ptr<Stmt>> body;
 };
 
 struct Ret
 {
-    Expr value;
+    std::unique_ptr<Expr> value;
 };
 
 struct Stmt

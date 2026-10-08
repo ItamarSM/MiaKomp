@@ -8,12 +8,14 @@ class Parser
 public:
     Parser(std::vector<Token> tokens);
     std::unique_ptr<Expr> parseExpr();
+    std::unique_ptr<Stmt> parseOneStmt();
 
 private:
     const Token &peek();
+    const Token &peekAhead(int c);
     const Token &advance();
     bool check(TokenType type) const;
-    void expect(TokenType type, std::string message);
+    const Token &expect(TokenType type, std::string message);
 
     std::unique_ptr<Expr> parsePrimary();
     std::unique_ptr<Expr> parseUnary();
@@ -24,6 +26,11 @@ private:
     std::unique_ptr<Expr> parseAnd();
     std::unique_ptr<Expr> parseOr();
     std::unique_ptr<Expr> parseOne();
+
+    std::unique_ptr<Stmt> parseStmt();
+
+    Type parseType();
+    std::vector<std::unique_ptr<Stmt>> parseBlock();
 
 private:
     const std::vector<Token> tokens;

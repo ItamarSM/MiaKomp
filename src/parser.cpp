@@ -9,6 +9,11 @@ const Token &Parser::peek()
     return this->tokens[this->pos];
 }
 
+const Token &Parser::peekAhead(int c)
+{
+    return this->tokens[this->pos + c];
+}
+
 const Token &Parser::advance()
 {
     this->pos += 1;
@@ -20,13 +25,13 @@ bool Parser::check(TokenType type) const
     return this->tokens[this->pos].type == type;
 }
 
-void Parser::expect(TokenType type, std::string message)
+const Token &Parser::expect(TokenType type, std::string message)
 {
     if (this->tokens[this->pos].type != type)
     {
         throw std::runtime_error(message);
     }
-    this->advance();
+    return this->advance();
 }
 
 std::unique_ptr<Expr> Parser::parsePrimary()
@@ -255,6 +260,124 @@ std::unique_ptr<Expr> Parser::parseOne()
 std::unique_ptr<Expr> Parser::parseExpr()
 {
     auto var = parseOne();
+    expect(TokenType::END, "Expected the file to end");
+    return var;
+}
+
+Type Parser::parseType()
+{
+    auto type = advance().type;
+    if (type == TokenType::BOOL_KW)
+    {
+        return Type::BOOL;
+    }
+    else if (type == TokenType::STRING_KW)
+    {
+        return Type::STRING;
+    }
+    else if (type == TokenType::FLOAT_KW)
+    {
+        return Type::FLOAT;
+    }
+    else if (type == TokenType::INT_KW)
+    {
+        return Type::INT;
+    }
+    else
+    {
+        throw std::runtime_error("Expected a type");
+    }
+}
+
+std::vector<std::unique_ptr<Stmt>> Parser::parseBlock()
+{
+    expect(TokenType::BRACE_OPEN, "Expected '{'");
+    std::vector<std::unique_ptr<Stmt>> block;
+    while (!check(TokenType::BRACE_CLOSE))
+    {
+        if (peek().type == TokenType::END)
+        {
+            throw std::runtime_error("Expected '}'");
+        }
+        block.push_back(parseStmt());
+    }
+    advance();
+    return block;
+}
+
+std::unique_ptr<Stmt> Parser::parseStmt()
+{
+    auto tok = peek();
+    if (tok.type == TokenType::make_KW)
+    {
+        advance();
+        auto name = expect(TokenType::IDENT, "Invalid name").text;
+        expect(TokenType::COLUMN, "Expected ':'");
+        auto type = parseType();
+        expect(TokenType::EQ_OP, "Expected '='");
+        auto value = parseOne();
+        expect(TokenType::SEMI, "Expected ';'");
+        auto var = std::make_unique<Stmt>();
+        var->stmt = Make{name, type, std::move(value)};
+        return var;
+    }
+    else if (tok.type == TokenType::RET_KW)
+    {
+        advance();
+        auto val = parseOne();
+        expect(TokenType::SEMI, "Expected ';'");
+        auto var = std::make_unique<Stmt>();
+        var->stmt = Ret{std::move(val)};
+        return var;
+    }
+    else if (tok.type == TokenType::if_KW)
+    {
+        advance();
+        auto condition = parseOne();
+        auto body = parseBlock();
+        std::vector<std::unique_ptr<Stmt>> elseBody;
+        if (peek().type == TokenType::else_KW)
+        {
+            advance();
+            elseBody = parseBlock();
+        }
+        auto var = std::make_unique<Stmt>();
+        var->stmt = If{std::move(condition), std::move(body), std::move(elseBody)};
+        return var;
+    }
+    else if (tok.type == TokenType::while_KW)
+    {
+        advance();
+        auto condition = parseOne();
+        auto body = parseBlock();
+        auto var = std::make_unique<Stmt>();
+        var->stmt = While{std::move(condition), std::move(body)};
+        return var;
+    }
+    else if (tok.type == TokenType::IDENT && peekAhead(1).type == TokenType::EQ_OP)
+    {
+        advance();
+        advance();
+        auto name = tok.text;
+        auto value = parseOne();
+        expect(TokenType::SEMI, "Expected ';'");
+        auto var = std::make_unique<Stmt>();
+        var->stmt = Assign{name, std::move(value)};
+        return var;
+    }
+    else
+    {
+        auto val = parseOne();
+        expect(TokenType::SEMI, "Expected ';'");
+        auto expr = std::make_unique<Stmt>();
+        expr->stmt = ExprStmt{std::move(val)};
+        return expr;
+    }
+}
+
+std::unique_ptr<Stmt> Parser::parseOneStmt()
+{
+    auto var = parseStmt();
     expect(TokenType::END, "Expected the file to end");
     return var;
 }
