@@ -715,3 +715,40 @@ the variant wrapper or pointer vs value stands.
 **Immediately next:** the two items above (spaces around ops, run both tests), push. Then the
 **parser**, reviewed against `docs/syntax.md`: tokens in, `Program` out, precedence and chained
 comparisons as recorded there. Name and outline it at the start of next session.
+
+### Session 8 — 2026-10-08 — Expression parser complete, statements parsed (untested)
+
+- Between sessions (commits `8ecc6f3`..`7d7888c`): `src/parser.hpp` + `src/parser.cpp`, recursive
+  descent, one function per precedence level: `parsePrimary` (literals, variables, calls, `( )`),
+  `parseUnary` (`-`), `parseMul`, `parseAdd`, `parseCompare` (one `Compare` node per chain).
+  `parseOne` = a whole expression, `parseExpr` = one expression then `END`. `parser.cpp` added to
+  `add_executable`.
+- This session: `parseNot` (recursive, like `parseUnary`, one level above comparisons),
+  `parseAnd`, `parseOr` (loop + reassign `left` = left-associative). Commit `aca6671`.
+- Review loop: `parseAnd`'s loop never consumed the `and` (right side started on the operator,
+  "Expected a value"); `parseOr` tested `not_KW` instead of `or_KW` (every `or` stopped the parse,
+  "Expected the file to end"). **Rule: every loop that stops on a token, ask who consumes it.**
+- **Verified**: clean `/W4`, 0 warnings. `a or b and c` -> `(a or (b and c))`, `a and b or c` ->
+  `((a and b) or c)`, `not a =? b` -> `not (a =? b)`, `a or b or c` -> `((a or b) or c)`, all as
+  predicted. `a or` and `a and and b` exit 1.
+- Statements: `If`/`While` conditions and `Ret::value` changed from `Expr` by value to
+  `unique_ptr<Expr>`, matching every other node. `peekAhead(c)` (no bounds check; only called
+  when `peek()` is an IDENT, which always has a token after it). `expect` now returns the
+  consumed `const Token&`. `parseType()` consumes its own token (chosen over passing a
+  `TokenType` in). `parseBlock()`: `{`, statements until `}`, throws on `END`, consumes `}`.
+  `parseStmt()` peeks and branches: `make`, `RET`, `if`/`else`, `while`, IDENT + `=` -> `Assign`,
+  else `ExprStmt`. Public `parseOneStmt()` = one statement then `END`.
+- Review loop: `parseBlock` didn't consume `}`; `parseStmt` advanced before branching, so the
+  `ExprStmt` fallback lost its first token (`print(x);` would silently parse as `(x)`); `Assign`
+  had no `expect(SEMI)`; `parseOneStmt` declared under `private:`. All fixed.
+- Clean `/W4` build, links. **No statement has run yet**: `main.cpp` still calls `parseExpr`.
+
+**Immediately next — run the statement parser:**
+1. `main.cpp`: `typeToString(Type)`, a `StmtPrinter` (one `operator()` per `Stmt` alternative,
+   expressions through `Printer`, bodies via recursive `std::visit(StmtPrinter{}, s->stmt)`),
+   and switch `main` to `parseOneStmt()` / `unique_ptr<Stmt>` / `prog->stmt`.
+2. Test table, predict each first: `make x:int = 1 + 2;`, `RET x;`, `x = x - 1;`, `print(x);`
+   (must print a call, not just `x`), `if a <? b { RET 1; } else { RET 2; }`,
+   `while (i <? 15) { i = i + 1; print(i); }`; errors: `make x:int = 5` and `make x = 5;` exit 1.
+3. Then `fn` declarations (params with types and trailing defaults, return type), `main:int { }`,
+   and `parseProgram` -> `Program` (top level holds only `make` and `fn`).
