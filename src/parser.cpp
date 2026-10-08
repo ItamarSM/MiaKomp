@@ -205,9 +205,50 @@ std::unique_ptr<Expr> Parser::parseCompare()
     }
 }
 
+std::unique_ptr<Expr> Parser::parseNot()
+{
+    if (peek().type == TokenType::not_KW)
+    {
+        advance();
+        auto var = parseNot();
+        auto neg = std::make_unique<Expr>();
+        neg->kind = Unary{UnaryOp::NOT, std::move(var)};
+        return neg;
+    }
+    return parseCompare();
+}
+
+std::unique_ptr<Expr> Parser::parseAnd()
+{
+    auto left = parseNot();
+    while (peek().type == TokenType::and_KW)
+    {
+        advance();
+        auto right = parseNot();
+        auto expr = std::make_unique<Expr>();
+        expr->kind = Binary{BinaryOp::AND, std::move(left), std::move(right)};
+        left = std::move(expr);
+    }
+    return left;
+}
+
+std::unique_ptr<Expr> Parser::parseOr()
+{
+    auto left = parseAnd();
+    while (peek().type == TokenType::or_KW)
+    {
+        advance();
+        auto right = parseAnd();
+        auto expr = std::make_unique<Expr>();
+        expr->kind = Binary{BinaryOp::OR, std::move(left), std::move(right)};
+        left = std::move(expr);
+    }
+    return left;
+}
+
 std::unique_ptr<Expr> Parser::parseOne()
 {
-    auto var = parseCompare();
+    auto var = parseOr();
     return var;
 }
 

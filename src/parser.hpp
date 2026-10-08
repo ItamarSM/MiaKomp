@@ -20,6 +20,9 @@ private:
     std::unique_ptr<Expr> parseMul();
     std::unique_ptr<Expr> parseAdd();
     std::unique_ptr<Expr> parseCompare();
+    std::unique_ptr<Expr> parseNot();
+    std::unique_ptr<Expr> parseAnd();
+    std::unique_ptr<Expr> parseOr();
     std::unique_ptr<Expr> parseOne();
 
 private:
