@@ -192,6 +192,7 @@ int main(int argc, char *argv[])
     }
 
     std::visit(Printer{}, prog->kind);
+    std::cout<<std::endl;
 
     /*
 
