@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.16)
 
 project(MiaKomp LANGUAGES CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 add_executable(miakomp
                src/main.cpp
                src/vm.cpp
