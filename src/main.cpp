@@ -99,7 +99,7 @@ public:
     void operator()(const IntLit &e) { std::cout << e.value; }
     void operator()(const FloatLit &e) { std::cout << e.value; }
     void operator()(const BoolLit &e) { std::cout << (e.value == true ? "true" : "false"); }
-    void operator()(const StringLit &e) { std::cout << e.value; }
+    void operator()(const StringLit &e) { std::cout << "\""<< e.value <<"\""; }
     void operator()(const Var &e) { std::cout << e.name; }
     void operator()(const Unary &e)
     {
@@ -129,15 +129,96 @@ public:
     }
     void operator()(const Call &e)
     {
-        std::cout << "Call, name : " << e.name << "\n";
+        std::cout << e.name << "(";
         int i = 0;
         for (const std::unique_ptr<Expr> &arg : e.args)
         {
-            std::cout << "arg " << i << ": ";
+            if (i != 0){
+                std::cout<<", ";
+            }
             std::visit(Printer{}, arg->kind);
-            std::cout << "\n";
             i++;
         }
+        std::cout<<")";
+    }
+};
+
+std::string typeToString(Type type){
+    switch (type){
+        case Type::BOOL:
+            return "bool";
+        case Type::FLOAT:
+            return "float";
+        case Type::INT:
+            return "int";
+        case Type::STRING:
+            return "string";
+    }
+    throw std::runtime_error("type not defined");
+}
+
+class StmtPrinter{
+public:
+
+    void printDepth(){
+        for (int i = 0; i < this->depth; i++){
+            std::cout<<"    ";
+        }
+    }
+
+    int depth = 0;
+
+    void operator()(const Make &s){
+        printDepth();
+        std::cout<<"make " << s.name << " : "<<typeToString(s.type) << " = ";
+        std::visit(Printer{}, s.value->kind);
+        std::cout<<";\n";
+    }
+    void operator()(const Assign &s){
+        printDepth();
+        std::cout<<s.name << " = ";
+        std::visit(Printer{}, s.value->kind);
+        std::cout<<";\n";
+    }
+    void operator()(const ExprStmt &s){
+        printDepth();
+        std::visit(Printer{}, s.expr->kind);
+        std::cout<<";\n";
+    }
+    void operator()(const If &s){
+        printDepth();
+        std::cout<<"if ";
+        std::visit(Printer{}, s.condition->kind);
+        std::cout<<" {\n";
+        for (const std::unique_ptr<Stmt> &e : s.body){
+            std::visit(StmtPrinter{this->depth + 1}, e->stmt);
+        }
+        printDepth();
+        std::cout<<"}\n";
+        printDepth();
+        std::cout<<"else {\n";
+        for (const std::unique_ptr<Stmt> &e : s.elseBody){
+            std::visit(StmtPrinter{this->depth + 1}, e->stmt);
+        }
+        printDepth();
+        std::cout<<"}\n";
+    }
+    void operator()(const While &s){
+        printDepth();
+        std::cout<<"while ";
+        std::visit(Printer{}, s.condition->kind);
+        std::cout<<" {\n";
+        for (const std::unique_ptr<Stmt> &e : s.body){
+            std::visit(StmtPrinter{this->depth + 1}, e->stmt);
+        }
+        printDepth();
+        std::cout<<"}\n";
+    }
+    void operator()(const Ret &s){
+        printDepth();
+        std::cout<<"RET ";
+        std::visit(Printer{}, s.value->kind);
+        std::cout<<";\n";
     }
 };
 
@@ -180,10 +261,10 @@ int main(int argc, char *argv[])
     */
 
     Parser parser(tokenList);
-    std::unique_ptr<Expr> prog;
+    std::unique_ptr<Stmt> prog;
     try
     {
-        prog = parser.parseExpr();
+        prog = parser.parseOneStmt();
     }
     catch (const std::exception &e)
     {
@@ -191,7 +272,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    std::visit(Printer{}, prog->kind);
+    std::visit(StmtPrinter{}, prog->stmt);
     std::cout<<std::endl;
 
     /*
