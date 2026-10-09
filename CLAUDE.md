@@ -554,10 +554,10 @@ MSVC tree to the other machine.
 - `gh auth login` (device flow), `gh repo create` → `https://github.com/ItamarSM/MiaKomp`, **public**,
   remote `origin`, `push -u`. Verified with `git ls-remote origin` = local `main` at `bb9d82d`.
 - Open: commits carry the real email in a public repo — noreply address offered, not decided.
-- Still unanswered: *why must `build/` never be committed?* Ask again before the Mac clone.
+- *Why must `build/` never be committed?* Answered (2026-10-09).
 
 **Mac clone is deferred** — I'll say when I'm on the Mac. Then: `git clone`, configure, build (first
-Mac check of `CMakeLists.txt` and `.gitattributes`), ask the `build/` question first.
+Mac check of `CMakeLists.txt` and `.gitattributes`). Done in Session 9.
 
 **Immediately next (on Windows):** split `reference/vm_original.cpp` into `src/vm.h` + `src/vm.cpp` (no
 `main()`, no test bytecode), add `vm.cpp` to `add_executable`, and drive it from `main.cpp`.
@@ -752,3 +752,18 @@ comparisons as recorded there. Name and outline it at the start of next session.
    `while (i <? 15) { i = i + 1; print(i); }`; errors: `make x:int = 5` and `make x = 5;` exit 1.
 3. Then `fn` declarations (params with types and trailing defaults, return type), `main:int { }`,
    and `parseProgram` -> `Program` (top level holds only `make` and `fn`).
+
+### Session 9 — 2026-10-09 — Mac set up
+
+- Repo cloned at `~/dev/MiaKomp`. CMake 4.4.4 (Homebrew), Apple clang 21 (arm64).
+- **First Mac check of `CMakeLists.txt`, verified by measurement**: the `else()` branch reaches the
+  compiler (`-Wall -Wextra -pedantic -std=gnu++17` on the verbose command line); `--clean-first`
+  = 0 warnings. `examples/expr.miak` prints `(a or (not b and c))`, exit 0.
+- `.gitattributes` holds: every tracked file stored with LF line endings (`i/lf`) or with no line
+  ending at all (`i/none`).
+- clang `-Wall` flagged a signed/unsigned comparison in the lexer's comment loop that MSVC `/W4`
+  did not; fixed with `int(src.size())`. `.DS_Store` added to `.gitignore`. Commits `8a3b2a8`,
+  `b70b63b`, `f439718`, one concern each, pushed.
+- The `build/` question from Session 2 is answered.
+
+**Immediately next:** unchanged from Session 8: `StmtPrinter` and the statement test table.
