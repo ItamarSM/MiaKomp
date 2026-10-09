@@ -161,7 +161,7 @@ std::vector<Token> Lexer::tokenize()
         }
         else if (peek() == '#')
         {
-            while (i < this->src.size() && peek() != '\n')
+            while (i < int(this->src.size()) && peek() != '\n')
             {
                 consume();
             }
