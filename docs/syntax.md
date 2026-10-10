@@ -14,6 +14,10 @@ Anything not listed here is undecided, not implied. See **Open questions** at th
   must `RET` an `int`. That value is the program's exit code.
 - A program has **exactly one** `main`. A missing `main` or a second `main` is a parse error.
 - Top-level `make` variables are in the outer scope, visible to `main` and to every function.
+- **Top-level order does not matter** for use inside functions: every function and global exists
+  before `main` starts, so `main` or a function may use a global or call a function declared below
+  it, and functions may call each other in any order. Global initializers run top to bottom, so
+  one global's initializer cannot read a global declared below it.
 
 ```
 make i:int = 5;
@@ -30,6 +34,9 @@ main:int {
 - `make name:type = value;` declares a new variable. The type annotation is **required**.
 - `name = value;` assigns to an existing variable. It never creates one.
 - Assigning in an inner scope changes the variable where it was declared (no Python `global` needed).
+- **Every `{ }` is a scope**, as in C++: a `make` inside an `if` or `while` body no longer exists
+  after its `}`. A function sees its own parameters and locals and the globals, never its
+  caller's locals.
 
 ```
 make count:int = 0;
@@ -45,6 +52,8 @@ count = count + 1;
 - Types are checked **before the program runs**, by a type-checking pass between the parser and
   the backends. `make b:bool = 5;` is rejected without running anything.
 - Until that pass exists, annotations are parsed and stored, and the interpreter ignores them.
+- **Arithmetic follows C++**: `int / int` is integer division, truncating toward zero (`7 / 2` is
+  `3`, `-7 / 2` is `-3`). Mixing `int` and `float` is legal and gives a `float` (`1 + 2.5` is `3.5`).
 
 ## Functions
 
@@ -53,6 +62,8 @@ count = count + 1;
 - Parameters may have defaults: `b:int = 5`. Parameters with defaults come **last**, as in C++:
   `fn f(a:int = 1, b:int)` is a parse error.
 - A default is **any expression**, not only a literal: `b:int = -5`, `b:int = 2 * 3`, `b:int = x`.
+- A default is evaluated **on every call that omits the argument**, as in C++, not once at
+  definition as in Python. `b:int = x` reads `x`'s value at the time of the call.
 - `RET value;` returns. `RET` is uppercase.
 - A function that can reach its end without `RET` is a type-check error.
 
@@ -128,11 +139,12 @@ fn checkAddition(a:int, b:int = 5):bool {
 
 Decide these before the stage that needs them:
 
-1. **`int / int`**: integer division, or a `float` result? *(type checker)*
-2. **Mixing `int` and `float`**: is `1 + 2.5` legal? *(type checker)*
-3. **When a default is evaluated**, and in which scope its names resolve: once when the function
-   is defined (Python) or on every call that omits the argument (C++)? Only visible when the default
-   reads a variable, e.g. `b:int = x`. *(interpreter)*
+1. **Redeclaring a name**: is `make x` legal when `x` already exists in the same scope, or in an
+   outer one (shadowing)? *(interpreter)*
+
+Answered 2026-10-10: `int / int` and mixing `int` with `float` (C++ rules, see Types); when a
+default is evaluated (every call, see Functions); top-level order (does not matter, see Program
+structure); block scope (every `{ }`, see Declarations).
 
 ---
 
