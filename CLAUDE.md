@@ -792,3 +792,40 @@ comparisons as recorded there. Name and outline it at the start of next session.
   UB); C4456 shadowed `arg`; returning `false` silently dropped a misplaced param. Final shape:
   `checkParam` returns `bool`, `parseFn` throws on `false`; `mainDecl` tracks "seen a main".
   Clean incremental build, 0 warnings. **Not yet run**: `main.cpp` still calls `parseOneStmt()`.
+
+### Session 11 — 2026-10-10 — Program parser verified, frontend complete
+
+- `examples/program.miak`: the `docs/syntax.md` example plus a second global (`make str:string`)
+  and `print(str);` in `main`.
+- `main` calls `parseProgram()` into a `Program prog` declared outside the `try` (assignment is a
+  move; `Program` is move-only). Printer for the non-variant structs as plain functions:
+  `printParam` (default only when `value != nullptr`), `printFn`, `printProgram`. Globals are
+  printed by **calling the visitor directly**, `StmtPrinter{0}(m)`: a callable object needs no
+  `std::visit` once the alternative is known.
+- Review: the comma index in `printFn` was never incremented; `)` after the params and the
+  function's `}` were never printed; `main`'s `}` was missing; with no newline after a
+  function's `}`, a second `fn` would print on the same line. All fixed.
+- **Verified**: `--clean-first` at `/W4` = 0 warnings (the only one on the way was C4100 from the
+  then-empty `printProgram`). `program.miak` prints back statement for statement, exit 0.
+- **Error table, 18 cases, run by Claude** in the scratchpad (no files kept in the repo), all as the
+  spec requires: empty `main` accepted; defaults-first, missing comma, trailing comma, no `main`,
+  two `main`s, `main:float`, top-level assignment, global `make` without `;`, unclosed `main`,
+  param without type, `fn` without return type, `main` without type, empty file — all exit 1 with
+  their own message; empty `()`, all-defaulted params, two functions — exit 0.
+- Accepted but not a parse error: an empty `main` with no `RET` (the spec makes that a
+  type-check error).
+- **Top-level order is unspecified**: `main`, then `fn`, then `make` parses, and the printer
+  reorders it to globals, functions, `main`. Not yet added to `docs/syntax.md`'s open questions:
+  can `main` (or a function) use a global declared below it? *(interpreter)*
+- Commit `95f0a27` "Add program printing", pushed.
+
+**The frontend is done**: source -> tokens -> `Program`, every syntax rule in `docs/syntax.md`
+that the parser owns is enforced.
+
+**Immediately next:**
+1. Add the top-level order question to `docs/syntax.md`'s open questions.
+2. Ladder #4 proper: the **tree-walking interpreter** (`src/interp.hpp` + `src/interp.cpp`).
+   Name and outline it at the start of next session: runtime value type, environments/scopes
+   for globals, function frames and blocks, evaluating each `Expr`, executing each `Stmt`,
+   calls with defaults, `RET`, and `main`'s return as the exit code. Answer open question 3
+   (when a default is evaluated) and the order question before it reads a variable.
