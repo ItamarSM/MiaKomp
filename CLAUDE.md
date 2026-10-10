@@ -767,3 +767,28 @@ comparisons as recorded there. Name and outline it at the start of next session.
 - The `build/` question from Session 2 is answered.
 
 **Immediately next:** unchanged from Session 8: `StmtPrinter` and the statement test table.
+
+### Session 10 — 2026-10-10 — Statement parser verified
+
+- Commit `dd0c87e`: `typeToString(Type)` and `StmtPrinter` (a `depth` member, `printDepth()`,
+  nested bodies via `std::visit(StmtPrinter{depth + 1}, ...)`). `main` calls `parseOneStmt()`.
+  The `If` printer always prints an `else { }` block, even when there is no `else`.
+- **Session 8 step 2 done**: I ran the whole statement table, including both error cases, by
+  hand. No `.miak` files were kept for them (same choice as Session 4); `examples/stmt.miak` holds
+  only `RET x;`.
+
+**Immediately next — Session 8 step 3:** `fn` declarations, `main:int { }`, `parseProgram` ->
+`Program`. Test with the example program from `docs/syntax.md` in `examples/program.miak`.
+
+- Step 3 first draft (uncommitted): `parseMake` (shared by `parseStmt`), `parseParam`, `parseFn`,
+  `parseMain` (rejects a non-`int` return type), `parseProgram`. Decision recorded in
+  `docs/syntax.md`: exactly one `main`, zero or two is a parse error.
+- Review: `Program{globals, funcs, mainFunc}` copies move-only vectors (C2280); top-level `make`
+  tested as `IDENT` + text instead of `make_KW`; defaults-last not enforced; commas between params
+  optional (`f(a:int b:int)` and a trailing comma parse); `mainFunc.empty()` used as "no main
+  seen", so an empty `main` reads as missing.
+- Second review round: inverted comma loop; later params never pushed; only defaulted params
+  pushed; empty `()` never consumed `)`; `checkParam` declared `bool` with no `return` (C4715,
+  UB); C4456 shadowed `arg`; returning `false` silently dropped a misplaced param. Final shape:
+  `checkParam` returns `bool`, `parseFn` throws on `false`; `mainDecl` tracks "seen a main".
+  Clean incremental build, 0 warnings. **Not yet run**: `main.cpp` still calls `parseOneStmt()`.
