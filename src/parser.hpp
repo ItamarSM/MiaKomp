@@ -9,6 +9,7 @@ public:
     Parser(std::vector<Token> tokens);
     std::unique_ptr<Expr> parseExpr();
     std::unique_ptr<Stmt> parseOneStmt();
+    Program parseProgram();
 
 private:
     const Token &peek();
@@ -28,6 +29,12 @@ private:
     std::unique_ptr<Expr> parseOne();
 
     std::unique_ptr<Stmt> parseStmt();
+
+    Make parseMake();
+    Param parseParam();
+    FnDecl parseFn();
+    bool checkParam(const Param &p, bool &d);
+    std::vector<std::unique_ptr<Stmt>> parseMain();
 
     Type parseType();
     std::vector<std::unique_ptr<Stmt>> parseBlock();

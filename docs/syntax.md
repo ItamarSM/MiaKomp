@@ -12,6 +12,7 @@ Anything not listed here is undecided, not implied. See **Open questions** at th
 - `main:int { ... }` is the entry point, like `int main()` in C++. Execution starts there.
   The return type is required, as everywhere else, and `main` follows the function rules: it
   must `RET` an `int`. That value is the program's exit code.
+- A program has **exactly one** `main`. A missing `main` or a second `main` is a parse error.
 - Top-level `make` variables are in the outer scope, visible to `main` and to every function.
 
 ```

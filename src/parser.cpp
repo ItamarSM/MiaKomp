@@ -310,15 +310,8 @@ std::unique_ptr<Stmt> Parser::parseStmt()
     auto tok = peek();
     if (tok.type == TokenType::make_KW)
     {
-        advance();
-        auto name = expect(TokenType::IDENT, "Invalid name").text;
-        expect(TokenType::COLUMN, "Expected ':'");
-        auto type = parseType();
-        expect(TokenType::EQ_OP, "Expected '='");
-        auto value = parseOne();
-        expect(TokenType::SEMI, "Expected ';'");
         auto var = std::make_unique<Stmt>();
-        var->stmt = Make{name, type, std::move(value)};
+        var->stmt = parseMake();
         return var;
     }
     else if (tok.type == TokenType::RET_KW)
@@ -380,4 +373,137 @@ std::unique_ptr<Stmt> Parser::parseOneStmt()
     auto var = parseStmt();
     expect(TokenType::END, "Expected the file to end");
     return var;
+}
+
+Make Parser::parseMake()
+{
+    advance();
+    auto name = expect(TokenType::IDENT, "Invalid name").text;
+    expect(TokenType::COLUMN, "Expected ':'");
+    auto type = parseType();
+    expect(TokenType::EQ_OP, "Expected '='");
+    auto value = parseOne();
+    expect(TokenType::SEMI, "Expected ';'");
+    Make var{name, type, std::move(value)};
+    return var;
+}
+
+Param Parser::parseParam()
+{
+    std::string name = expect(TokenType::IDENT, "Invalid arg name").text;
+    expect(TokenType::COLUMN, "Expected ':'");
+    Type type = parseType();
+    std::unique_ptr<Expr> value = nullptr;
+    if (peek().type == TokenType::EQ_OP)
+    {
+        advance();
+        value = parseOne();
+    }
+    return Param{name, type, std::move(value)};
+}
+
+bool Parser::checkParam(const Param &p, bool &d)
+{
+    if (p.value != nullptr)
+    {
+        d = 1;
+    }
+    else if (p.value == nullptr && d == 1)
+    {
+        return 0;
+    }
+    return 1;
+}
+
+FnDecl Parser::parseFn()
+{
+    expect(TokenType::fn_KW, "undefined function");
+    std::string name = expect(TokenType::IDENT, "invalid name").text;
+    expect(TokenType::PARAN_OPEN, "Expected '('");
+    std::vector<Param> params;
+    bool defaults = 0;
+    if (peek().type != TokenType::PARAN_CLOSE)
+    {
+        Param arg = parseParam();
+        if (checkParam(arg, defaults))
+        {
+            params.push_back(std::move(arg));
+        }
+        else
+        {
+            throw std::runtime_error("Default arguments must come last");
+        }
+        while (peek().type == TokenType::COMMA)
+        {
+            advance();
+            Param param = parseParam();
+            if (checkParam(param, defaults))
+            {
+                params.push_back(std::move(param));
+            }
+            else
+            {
+                throw std::runtime_error("Default arguments must come last");
+            }
+        }
+    }
+    expect(TokenType::PARAN_CLOSE, "Expected ')'");
+    expect(TokenType::COLUMN, "Expected a return type");
+    Type type = parseType();
+    auto body = parseBlock();
+    return FnDecl{name, std::move(params), type, std::move(body)};
+}
+
+std::vector<std::unique_ptr<Stmt>> Parser::parseMain()
+{
+    if (peek().type != TokenType::main_KW)
+    {
+        throw std::runtime_error("Expected a main function");
+    }
+    advance();
+    expect(TokenType::COLUMN, "Expected a return type");
+    expect(TokenType::INT_KW, "Invalid return type (only int allowed)");
+    return parseBlock();
+}
+
+Program Parser::parseProgram()
+{
+    std::vector<Make> globals;
+    std::vector<FnDecl> funcs;
+    std::vector<std::unique_ptr<Stmt>> mainFunc;
+
+    bool mainDecl = 0;
+
+    while (peek().type != TokenType::END)
+    {
+        if (peek().type == TokenType::make_KW)
+        {
+            globals.push_back(parseMake());
+        }
+        else if (peek().type == TokenType::fn_KW)
+        {
+            funcs.push_back(parseFn());
+        }
+        else if (peek().type == TokenType::main_KW)
+        {
+            if (!mainDecl)
+            {
+                mainFunc = parseMain();
+                mainDecl = 1;
+            }
+            else
+            {
+                throw std::runtime_error("Cannot declare two mains");
+            }
+        }
+        else
+        {
+            throw std::runtime_error("can only declare outside main");
+        }
+    }
+    if (!mainDecl)
+    {
+        throw std::runtime_error("Must declare main");
+    }
+    return Program{std::move(globals), std::move(funcs), std::move(mainFunc)};
 }
