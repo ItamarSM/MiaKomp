@@ -99,7 +99,7 @@ public:
     void operator()(const IntLit &e) { std::cout << e.value; }
     void operator()(const FloatLit &e) { std::cout << e.value; }
     void operator()(const BoolLit &e) { std::cout << (e.value == true ? "true" : "false"); }
-    void operator()(const StringLit &e) { std::cout << "\""<< e.value <<"\""; }
+    void operator()(const StringLit &e) { std::cout << "\"" << e.value << "\""; }
     void operator()(const Var &e) { std::cout << e.name; }
     void operator()(const Unary &e)
     {
@@ -133,94 +133,158 @@ public:
         int i = 0;
         for (const std::unique_ptr<Expr> &arg : e.args)
         {
-            if (i != 0){
-                std::cout<<", ";
+            if (i != 0)
+            {
+                std::cout << ", ";
             }
             std::visit(Printer{}, arg->kind);
             i++;
         }
-        std::cout<<")";
+        std::cout << ")";
     }
 };
 
-std::string typeToString(Type type){
-    switch (type){
-        case Type::BOOL:
-            return "bool";
-        case Type::FLOAT:
-            return "float";
-        case Type::INT:
-            return "int";
-        case Type::STRING:
-            return "string";
+std::string typeToString(Type type)
+{
+    switch (type)
+    {
+    case Type::BOOL:
+        return "bool";
+    case Type::FLOAT:
+        return "float";
+    case Type::INT:
+        return "int";
+    case Type::STRING:
+        return "string";
     }
     throw std::runtime_error("type not defined");
 }
 
-class StmtPrinter{
+class StmtPrinter
+{
 public:
-
-    void printDepth(){
-        for (int i = 0; i < this->depth; i++){
-            std::cout<<"    ";
+    void printDepth()
+    {
+        for (int i = 0; i < this->depth; i++)
+        {
+            std::cout << "    ";
         }
     }
 
     int depth = 0;
 
-    void operator()(const Make &s){
+    void operator()(const Make &s)
+    {
         printDepth();
-        std::cout<<"make " << s.name << " : "<<typeToString(s.type) << " = ";
+        std::cout << "make " << s.name << " : " << typeToString(s.type) << " = ";
         std::visit(Printer{}, s.value->kind);
-        std::cout<<";\n";
+        std::cout << ";\n";
     }
-    void operator()(const Assign &s){
+    void operator()(const Assign &s)
+    {
         printDepth();
-        std::cout<<s.name << " = ";
+        std::cout << s.name << " = ";
         std::visit(Printer{}, s.value->kind);
-        std::cout<<";\n";
+        std::cout << ";\n";
     }
-    void operator()(const ExprStmt &s){
+    void operator()(const ExprStmt &s)
+    {
         printDepth();
         std::visit(Printer{}, s.expr->kind);
-        std::cout<<";\n";
+        std::cout << ";\n";
     }
-    void operator()(const If &s){
+    void operator()(const If &s)
+    {
         printDepth();
-        std::cout<<"if ";
+        std::cout << "if ";
         std::visit(Printer{}, s.condition->kind);
-        std::cout<<" {\n";
-        for (const std::unique_ptr<Stmt> &e : s.body){
+        std::cout << " {\n";
+        for (const std::unique_ptr<Stmt> &e : s.body)
+        {
             std::visit(StmtPrinter{this->depth + 1}, e->stmt);
         }
         printDepth();
-        std::cout<<"}\n";
+        std::cout << "}\n";
         printDepth();
-        std::cout<<"else {\n";
-        for (const std::unique_ptr<Stmt> &e : s.elseBody){
+        std::cout << "else {\n";
+        for (const std::unique_ptr<Stmt> &e : s.elseBody)
+        {
             std::visit(StmtPrinter{this->depth + 1}, e->stmt);
         }
         printDepth();
-        std::cout<<"}\n";
+        std::cout << "}\n";
     }
-    void operator()(const While &s){
+    void operator()(const While &s)
+    {
         printDepth();
-        std::cout<<"while ";
+        std::cout << "while ";
         std::visit(Printer{}, s.condition->kind);
-        std::cout<<" {\n";
-        for (const std::unique_ptr<Stmt> &e : s.body){
+        std::cout << " {\n";
+        for (const std::unique_ptr<Stmt> &e : s.body)
+        {
             std::visit(StmtPrinter{this->depth + 1}, e->stmt);
         }
         printDepth();
-        std::cout<<"}\n";
+        std::cout << "}\n";
     }
-    void operator()(const Ret &s){
+    void operator()(const Ret &s)
+    {
         printDepth();
-        std::cout<<"RET ";
+        std::cout << "RET ";
         std::visit(Printer{}, s.value->kind);
-        std::cout<<";\n";
+        std::cout << ";\n";
     }
 };
+
+void printParam(const Param &p)
+{
+    std::cout << p.name << " : " << typeToString(p.type);
+    if (p.value != nullptr)
+    {
+        std::cout << " = ";
+        std::visit(Printer{}, p.value->kind);
+    }
+}
+
+void printFn(const FnDecl &f)
+{
+    std::cout << "fn " << f.name << " (";
+    int i = 0;
+    for (const Param &p : f.params)
+    {
+        if (i != 0)
+        {
+            std::cout << ", ";
+        }
+        printParam(p);
+        i++;
+    }
+    std::cout << ") : " << typeToString(f.retType) << " {\n";
+    for (const std::unique_ptr<Stmt> &s : f.body)
+    {
+        std::visit(StmtPrinter{1}, s->stmt);
+    }
+    std::cout << "}\n";
+}
+
+void printProgram(const Program &prog)
+{
+    for (const Make &m : prog.globals)
+    {
+        StmtPrinter{0}(m);
+    }
+    std::cout << "\n\n";
+    for (const FnDecl &f : prog.funcs)
+    {
+        printFn(f);
+    }
+    std::cout << "\n\nmain : int {\n";
+    for (const std::unique_ptr<Stmt> &s : prog.mainFunc)
+    {
+        std::visit(StmtPrinter{1}, s->stmt);
+    }
+    std::cout << "}\n";
+}
 
 int main(int argc, char *argv[])
 {
@@ -261,10 +325,10 @@ int main(int argc, char *argv[])
     */
 
     Parser parser(tokenList);
-    std::unique_ptr<Stmt> prog;
+    Program prog;
     try
     {
-        prog = parser.parseOneStmt();
+        prog = parser.parseProgram();
     }
     catch (const std::exception &e)
     {
@@ -272,8 +336,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    std::visit(StmtPrinter{}, prog->stmt);
-    std::cout<<std::endl;
+    printProgram(prog);
 
     /*
 

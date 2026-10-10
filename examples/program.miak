@@ -1,0 +1,22 @@
+make i:int = 5;
+make str:string = "Hello, World!";
+
+fn checkAddition(a:int, b:int = 5):bool {
+    if (a + b) =? 3 {
+        RET true;
+    }
+    RET false;
+}
+
+main:int {
+    print(str);
+    i = 9;
+    print(i);                               # 9
+    make b:bool = checkAddition(i, -6);
+    print(b);                               # true
+    while i <? 15 {
+        print(i);                           # 9 10 11 12 13 14
+        i = i + 1;
+    }
+    RET 0;
+}
