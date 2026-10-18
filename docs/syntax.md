@@ -37,6 +37,10 @@ main:int {
 - **Every `{ }` is a scope**, as in C++: a `make` inside an `if` or `while` body no longer exists
   after its `}`. A function sees its own parameters and locals and the globals, never its
   caller's locals.
+- **No redeclaring, no shadowing**: `make x` is an error when any `x` is visible, whether it is in
+  the same scope or an outer one, globals included. A parameter counts as a declaration in the
+  function's scope. Two sibling blocks may each `make x`, because the first `x` is gone after its
+  `}`.
 
 ```
 make count:int = 0;
@@ -64,6 +68,8 @@ count = count + 1;
 - A default is **any expression**, not only a literal: `b:int = -5`, `b:int = 2 * 3`, `b:int = x`.
 - A default is evaluated **on every call that omits the argument**, as in C++, not once at
   definition as in Python. `b:int = x` reads `x`'s value at the time of the call.
+- A default's names resolve in the **function's own scope**, never the caller's: it sees the
+  globals and the parameters before it, as bound for this call.
 - `RET value;` returns. `RET` is uppercase.
 - A function that can reach its end without `RET` is a type-check error.
 
@@ -139,8 +145,10 @@ fn checkAddition(a:int, b:int = 5):bool {
 
 Decide these before the stage that needs them:
 
-1. **Redeclaring a name**: is `make x` legal when `x` already exists in the same scope, or in an
-   outer one (shadowing)? *(interpreter)*
+None open.
+
+Answered 2026-10-17: redeclaring and shadowing (both errors, see Declarations); which scope a
+default reads (the function's own, see Functions).
 
 Answered 2026-10-10: `int / int` and mixing `int` with `float` (C++ rules, see Types); when a
 default is evaluated (every call, see Functions); top-level order (does not matter, see Program
