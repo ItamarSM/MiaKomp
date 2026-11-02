@@ -2,6 +2,7 @@
 #include "lexer.hpp"
 #include "ast.hpp"
 #include "parser.hpp"
+#include "interp.hpp"
 #include <fstream>
 #include <sstream>
 
@@ -324,6 +325,7 @@ int main(int argc, char *argv[])
     }
     */
 
+    /*
     Parser parser(tokenList);
     Program prog;
     try
@@ -337,6 +339,7 @@ int main(int argc, char *argv[])
     }
 
     printProgram(prog);
+    */
 
     /*
 
@@ -383,6 +386,17 @@ int main(int argc, char *argv[])
     std::cout << "\n";
 
     */
+
+    Env env;
+    try
+    {
+        env.pushScope();
+        env.assign("x", long long(1));
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what();
+    }
 
     return 0;
 }
