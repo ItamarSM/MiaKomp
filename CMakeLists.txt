@@ -8,7 +8,8 @@ add_executable(miakomp
                src/main.cpp
                src/vm.cpp
                src/lexer.cpp
-               src/parser.cpp)
+               src/parser.cpp
+               src/interp.cpp)
 
 target_compile_features(miakomp PRIVATE cxx_std_17)
 
