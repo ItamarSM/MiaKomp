@@ -325,12 +325,11 @@ int main(int argc, char *argv[])
     }
     */
 
-    /*
     Parser parser(tokenList);
-    Program prog;
+    std::unique_ptr<Expr> prog;
     try
     {
-        prog = parser.parseProgram();
+        prog = parser.parseExpr();
     }
     catch (const std::exception &e)
     {
@@ -338,8 +337,19 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    printProgram(prog);
-    */
+    Env env;
+    Evaluator eval(env);
+    try
+    {
+        env.declare("x", 10LL);
+        Value e = std::visit(eval, prog->kind);
+        std::cout << valuetoString(e);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what();
+        return EXIT_FAILURE;
+    }
 
     /*
 
@@ -386,17 +396,6 @@ int main(int argc, char *argv[])
     std::cout << "\n";
 
     */
-
-    Env env;
-    try
-    {
-        env.pushScope();
-        env.assign("x", long long(1));
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << e.what();
-    }
 
     return 0;
 }
