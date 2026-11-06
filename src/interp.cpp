@@ -297,5 +297,205 @@ Value Evaluator::operator()(const Binary &e)
     }
     throw std::runtime_error("No such binary op");
 }
-Value Evaluator::operator()(const Compare &e) { throw std::runtime_error("not implemented"); }
-Value Evaluator::operator()(const Call &e) { throw std::runtime_error("not implemented"); }
+Value Evaluator::operator()(const Compare &e)
+{
+    Value left = std::visit(*this, e.operands[0]->kind);
+    bool cont = true;
+    for (int i = 0; i < int(e.ops.size()); i++)
+    {
+        Value right = std::visit(*this, e.operands[i + 1]->kind);
+        switch (e.ops[i])
+        {
+        case CompareOp::EQ:
+            if (std::holds_alternative<long long>(left) && std::holds_alternative<long long>(right))
+            {
+                cont = std::get<long long>(left) == std::get<long long>(right);
+            }
+            else if (std::holds_alternative<double>(left) && std::holds_alternative<double>(right))
+            {
+                cont = std::get<double>(left) == std::get<double>(right);
+            }
+            else if (std::holds_alternative<bool>(left) && std::holds_alternative<bool>(right))
+            {
+                cont = std::get<bool>(left) == std::get<bool>(right);
+            }
+            else if (std::holds_alternative<std::string>(left) && std::holds_alternative<std::string>(right))
+            {
+                cont = std::get<std::string>(left) == std::get<std::string>(right);
+            }
+            else
+            {
+                throw std::runtime_error("Cannot compare these types with each other");
+            }
+            break;
+
+        case CompareOp::GT:
+            if (std::holds_alternative<long long>(left) && std::holds_alternative<long long>(right))
+            {
+                cont = std::get<long long>(left) > std::get<long long>(right);
+            }
+            else if (std::holds_alternative<double>(left) && std::holds_alternative<double>(right))
+            {
+                cont = std::get<double>(left) > std::get<double>(right);
+            }
+            else
+            {
+                throw std::runtime_error("Cannot compare these types with each other");
+            }
+            break;
+
+        case CompareOp::LT:
+            if (std::holds_alternative<long long>(left) && std::holds_alternative<long long>(right))
+            {
+                cont = std::get<long long>(left) < std::get<long long>(right);
+            }
+            else if (std::holds_alternative<double>(left) && std::holds_alternative<double>(right))
+            {
+                cont = std::get<double>(left) < std::get<double>(right);
+            }
+            else
+            {
+                throw std::runtime_error("Cannot compare these types with each other");
+            }
+            break;
+
+        case CompareOp::GTEQ:
+            if (std::holds_alternative<long long>(left) && std::holds_alternative<long long>(right))
+            {
+                cont = std::get<long long>(left) >= std::get<long long>(right);
+            }
+            else if (std::holds_alternative<double>(left) && std::holds_alternative<double>(right))
+            {
+                cont = std::get<double>(left) >= std::get<double>(right);
+            }
+            else
+            {
+                throw std::runtime_error("Cannot compare these types with each other");
+            }
+            break;
+
+        case CompareOp::LTEQ:
+            if (std::holds_alternative<long long>(left) && std::holds_alternative<long long>(right))
+            {
+                cont = std::get<long long>(left) <= std::get<long long>(right);
+            }
+            else if (std::holds_alternative<double>(left) && std::holds_alternative<double>(right))
+            {
+                cont = std::get<double>(left) <= std::get<double>(right);
+            }
+            else
+            {
+                throw std::runtime_error("Cannot compare these types with each other");
+            }
+            break;
+
+        case CompareOp::NOTEQ:
+            if (std::holds_alternative<long long>(left) && std::holds_alternative<long long>(right))
+            {
+                cont = std::get<long long>(left) != std::get<long long>(right);
+            }
+            else if (std::holds_alternative<double>(left) && std::holds_alternative<double>(right))
+            {
+                cont = std::get<double>(left) != std::get<double>(right);
+            }
+            else if (std::holds_alternative<bool>(left) && std::holds_alternative<bool>(right))
+            {
+                cont = std::get<bool>(left) != std::get<bool>(right);
+            }
+            else if (std::holds_alternative<std::string>(left) && std::holds_alternative<std::string>(right))
+            {
+                cont = std::get<std::string>(left) != std::get<std::string>(right);
+            }
+            else
+            {
+                throw std::runtime_error("Cannot compare these types with each other");
+            }
+            break;
+        }
+        if (!cont)
+        {
+            return false;
+        }
+        left = right;
+    }
+    return true;
+}
+
+Value Evaluator::operator()(const Call &e)
+{
+    if (e.name == "print")
+    {
+        for (const std::unique_ptr<Expr> &expr : e.args)
+        {
+            std::cout << valuetoString(std::visit(*this, expr->kind));
+        }
+        return std::monostate{};
+    }
+    throw std::runtime_error("not implemented");
+}
+
+Executor::Executor(Env &env) : env(env) {}
+
+void Executor::operator()(const Make &e)
+{
+
+    env.declare(e.name, std::visit(eval, e.value->kind));
+}
+void Executor::operator()(const Assign &e)
+{
+
+    env.assign(e.name, std::visit(eval, e.value->kind));
+}
+void Executor::operator()(const ExprStmt &e)
+{
+
+    Value a = std::visit(eval, e.expr->kind);
+}
+void Executor::operator()(const If &e)
+{
+    Value condition = std::visit(eval, e.condition->kind);
+    if (!std::holds_alternative<bool>(condition))
+    {
+        throw std::runtime_error("condition must be of type bool");
+    }
+    if (std::get<bool>(condition))
+    {
+        env.pushScope();
+        for (const std::unique_ptr<Stmt> &stmt : e.body)
+        {
+            std::visit(*this, stmt->stmt);
+        }
+        env.popScope();
+    }
+    else
+    {
+        env.pushScope();
+        for (const std::unique_ptr<Stmt> &stmt : e.elseBody)
+        {
+            std::visit(*this, stmt->stmt);
+        }
+        env.popScope();
+    }
+}
+void Executor::operator()(const While &e)
+{
+    Value condition = std::visit(eval, e.condition->kind);
+    if (!std::holds_alternative<bool>(condition))
+    {
+        throw std::runtime_error("condition must be of type bool");
+    }
+    while (std::get<bool>(condition))
+    {
+        env.pushScope();
+        for (const std::unique_ptr<Stmt> &stmt : e.body)
+        {
+            std::visit(*this, stmt->stmt);
+        }
+        env.popScope();
+        condition = std::visit(eval, e.condition->kind);
+    }
+}
+void Executor::operator()(const Ret &e)
+{
+    throw std::runtime_error("not implemented");
+}

@@ -8,6 +8,7 @@
 #include <vector>
 #include <stdexcept>
 #include "ast.hpp"
+#include <iostream>
 
 using Value = std::variant<std::string, long long, double, bool, std::monostate>;
 
@@ -47,4 +48,22 @@ public:
     Value operator()(const Binary &e);
     Value operator()(const Compare &e);
     Value operator()(const Call &e);
+};
+
+class Executor
+{
+private:
+    Env &env;
+    Evaluator eval{env};
+
+public:
+    Executor(Env &env);
+
+public:
+    void operator()(const Make &e);
+    void operator()(const Assign &e);
+    void operator()(const ExprStmt &e);
+    void operator()(const If &e);
+    void operator()(const While &e);
+    void operator()(const Ret &e);
 };
