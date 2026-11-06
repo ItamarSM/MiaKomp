@@ -103,6 +103,12 @@ fn checkAddition(a:int, b:int = 5):bool {
 - `and` / `or` **short-circuit**: in `a and b`, `b` is not evaluated when `a` is false; in
   `a or b`, `b` is not evaluated when `a` is true.
 - The operands of `and`, `or` and `not` must be `bool`.
+- `=?` and `!=?` take two operands of the **same type**: two `int`s, two `float`s, two `bool`s
+  or two `string`s.
+- `<?` `>?` `<=?` `>=?` take two `int`s or two `float`s only. Ordering a `bool` or a `string`
+  is an error.
+- **`int` and `float` do not mix in a comparison**: `2 =? 2.0` is an error, even though
+  `2 + 2.0` is legal arithmetic.
 - **Precedence**, lowest to highest: `or` < `and` < `not` < comparisons < `+ -` < `* /` <
   unary `-`. Parentheses override it.
 - Binary operators are **left-associative**: `a - b - c` is `(a - b) - c`.
@@ -146,6 +152,8 @@ fn checkAddition(a:int, b:int = 5):bool {
 Decide these before the stage that needs them:
 
 None open.
+
+Answered 2026-11-05: which operand types each comparison takes (see Operators).
 
 Answered 2026-10-17: redeclaring and shadowing (both errors, see Declarations); which scope a
 default reads (the function's own, see Functions).
