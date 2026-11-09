@@ -306,7 +306,6 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    /*
     Lexer lex(sourceCode);
     std::vector<Token> tokenList;
     try
@@ -318,7 +317,7 @@ int main(int argc, char *argv[])
         std::cerr << e.what() << "\n";
         return EXIT_FAILURE;
     }
-    */
+
     /*
     for (const auto &t : tokenList)
     {
@@ -327,38 +326,28 @@ int main(int argc, char *argv[])
     }
     */
 
-    /*
     Parser parser(tokenList);
-    std::unique_ptr<Expr> prog;
+    Program prog;
     try
     {
-        prog = parser.parseExpr();
+        prog = parser.parseProgram();
     }
     catch (const std::exception &e)
     {
         std::cerr << e.what() << "\n";
         return EXIT_FAILURE;
     }
-    */
 
-    Env env;
-    Evaluator eval(env);
-    Executor exec(env);
-
+    int retVal;
     try
     {
-        env.declare("g", 1LL);
-        env.pushFrame();
-        env.declare("x", 5LL);
-        env.pushScope();
-        env.pushFrame();
-        env.declare("x", 8LL);
-        std::cout << valuetoString(env.lookup("x")) << "\n";
-        env.declare("g", 9LL);
+        retVal = runProgram(prog);
+        return retVal;
     }
     catch (const std::exception &e)
     {
-        std::cerr << e.what();
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
     }
 
     /*
