@@ -389,6 +389,22 @@ together with `docs/syntax.md` for how each feature is spelled.
   default). GCC/Clang `-Wall` includes `-Wswitch` and would. A `throw` after the `switch` turns a
   missed case into a loud runtime error instead of a silent one
 
+### `std::optional` and container gotchas (2026-11-09, the interpreter)
+- `std::optional<Value>` (`<optional>`) = "a `Value` or nothing", Python's `Optional[...]`.
+  `return {};` is the empty one; `.has_value()` tests it. Used as the `Executor`'s result:
+  empty = keep going, holding a value = a `RET` happened
+- **`auto` deduces from the whole right-hand side.** `auto ret = f().has_value();` makes `ret` a
+  `bool`, because the member call runs before `=`. `return ret;` then silently converted that
+  `bool` into an `optional<Value>` holding `true`: every `RET` inside an `if` returned `true`,
+  clean at `/W4`. Store the object first, test it second
+- **`.back()` / `[0]` on an empty `vector` is undefined behaviour.** MSVC Debug catches it as an
+  `abort()`: **exit code 3, no message**. Release would read garbage
+- `find(k) == end()` means **not found**. Inverted twice in one session (`!checkKey`,
+  `globMap.find`); read the comparison out loud
+- An inner `if` with no `else` inside an outer `if` is a silent path: the outer `else` is not
+  its alternative. Asking "is it taken?" once, before "where does it go?", leaves one `throw`
+  no path can skip
+
 ### Class mechanics
 - `= default` is a **declaration**, so it obeys the `public:`/`private:` section it sits in — a
   private default constructor makes the class un-instantiable (C2248). Also: you only need it when
@@ -439,6 +455,10 @@ together with `docs/syntax.md` for how each feature is spelled.
   2026-09-24). `#include` pastes the header in, so repeating `= value` on the `.cpp` definition
   is a second default in the same translation unit. The default must stay on the header
   declaration because it is filled in at the *call site*, and callers only see the header
+- **A signature changed in the `.cpp` but not the header is a new overload, not a redefinition**
+  (2026-11-09, `checkKey`). Callers bind to the header's old declaration and compile clean; the
+  linker then finds no body for it: `LNK2019`, not a compile error. Read the parameter types in
+  the mangled name to see which version the caller wanted
 
 ### CMake
 - CMake is a **generator**, not a compiler: `cmake -S . -B build` (configure) writes the platform's
@@ -829,3 +849,67 @@ that the parser owns is enforced.
    for globals, function frames and blocks, evaluating each `Expr`, executing each `Stmt`,
    calls with defaults, `RET`, and `main`'s return as the exit code. Answer open question 3
    (when a default is evaluated) and the order question before it reads a variable.
+
+### Between sessions — 2026-10-17 .. 2026-11-06 — Interpreter first half
+
+Not reviewed when written; read at the start of Session 12.
+- `docs/syntax.md`: every open question answered. Top-level order doesn't matter (functions and
+  globals exist before `main`; global initializers run top to bottom). Every `{ }` is a scope;
+  no redeclaring, no shadowing, globals and parameters included. `int / int` truncates, `int`
+  and `float` mix in arithmetic but **not** in comparisons. Defaults evaluated on every call, in
+  the function's own scope. Conditions must be `bool`. Operand types for every comparison.
+- `src/interp.hpp` + `src/interp.cpp`, in `add_executable`: `Value` =
+  `variant<string, long long, double, bool, monostate>`, `valuetoString` (bool as
+  `true`/`false`, `setprecision(15)`), `Env` (globals + scope stack), `Evaluator` (every `Expr`;
+  `Call` handles only `print`), `Executor` (every `Stmt`, `Ret` was a stub).
+- Commits `51f4851`..`70141a0`.
+
+### Session 12 — 2026-11-09 — `RET` propagation and call frames
+
+Ladder #4's remaining work, outlined at the start: (1) how `RET` gets out, (2) frames in `Env`,
+(3) `Evaluator::operator()(const Call&)`, (4) running a `Program`. **1 and 2 are done.**
+
+- **`RET` returns, it doesn't throw**: every `Executor::operator()` returns
+  `std::optional<Value>`. `If`/`While` body loops check each statement's result and return it
+  straight away, popping their scope first. Reason: exceptions are the error mechanism; `RET`
+  is not an error.
+- **Frames**: `Env::frameMap` is `vector<vector<unordered_map<string, Value>>>`, a stack of
+  frames, each a stack of scopes. `pushFrame` opens the frame's first scope itself (so
+  `.back().back()` is always valid inside a frame). `lookup` searches the top frame's scopes
+  top-down, then globals; with no frame, globals only. `declare` asks "visible?" once (global,
+  or in the top frame via `checkKey`), throws "Variable name already used", else inserts into
+  the top scope or into the globals.
+- Review loop, in order: `checkKey` signature changed in the `.cpp` only (`LNK2019`); `RET`
+  results discarded in `If`/`While`; `checkKey(frameMap[0])` checked `main`'s frame and read an
+  empty vector; `auto ret = ...has_value()` deduced `bool`, so `RET 5` returned `true`;
+  `pushFrame` opened no scope; `checkKey` call deleted (redeclaring silently overwrote via
+  `operator[]`); `!` missing; `frameMap.back()` before the guard in `&&` (exit 3, MSVC Debug
+  abort); inner `if` without `else` silently ignored a redeclaration; frames stopped checking
+  globals; `globMap.find(...) == end()` inverted (every new name threw); unused `visible` (C4189).
+- **Verified**: `--clean-first` at `/W4` = 0 warnings. The full five-check `Env` table (global;
+  redeclare in one scope; shadow in an inner scope; new frame can't see caller's `x`, can declare
+  its own, sees globals; shadow a global from a frame; caller's `x` back after `popFrame`) all as
+  the spec requires. **Run by Claude** in a scratchpad harness: my own harness in `main.cpp` ran
+  the checks in one `try`, so only part of the table executed.
+- Commits `d8a40fc` (frames + RET), `d088277` (the test harness in `main.cpp`, which comments
+  out the lexer and parser), `d58f1f6` (`examples/empty.miak`, only there so `argc == 2`). Pushed.
+- **No `RET` has run through real MiaKomp source yet**: nothing executes a `Program`.
+- Still open: does `print` end with a newline? Undecided, not in `docs/syntax.md`. The spec
+  example (`9`, `true`, `9 10 11 ...`) runs together without one. Decide before step 4's test.
+- The stray empty `CMakePresets.json` was deleted.
+
+**Immediately next — step 3, `Call`:**
+1. Decide where the name → `const FnDecl*` lookup lives (`Env`, `Evaluator`, or a new class that
+   runs the program) and show it before writing the call body. `FnDecl` is move-only and lives in
+   `Program`, so a non-owning pointer; `Program` must outlive the interpreter.
+2. The call, in order: find the function (throw if missing); arg count between the number of
+   non-defaulted params and the total; **evaluate args in the caller's frame, before
+   `pushFrame`**; push, declare params, evaluate each omitted default in the new frame after the
+   params before it; run the body; on a `RET` pop the frame and return the value; falling off the
+   end throws.
+3. Step 4: register all functions, run global `make`s top to bottom, run `main` in its own frame,
+   its `RET` `int` is the exit code. Restore the lexer/parser in `main.cpp` and switch to
+   `parseProgram()`.
+4. Tests, predict first: `examples/program.miak`; recursive `fact(10)` = `3628800`; a function
+   reading `main`'s local exits 1 "Undefined variable"; default `b:int = g` sees `g`'s current
+   value; `RET 3;` from `main` → exit 3, measured with `$?`.
