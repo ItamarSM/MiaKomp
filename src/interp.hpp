@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include "ast.hpp"
 #include <iostream>
+#include <optional>
 
 using Value = std::variant<std::string, long long, double, bool, std::monostate>;
 
@@ -18,9 +19,11 @@ class Env
 {
 private:
     std::unordered_map<std::string, Value> globMap;
-    std::vector<std::unordered_map<std::string, Value>> scopeMap;
+    std::vector<std::vector<std::unordered_map<std::string, Value>>> frameMap;
 
 public:
+    void pushFrame();
+    void popFrame();
     void pushScope();
     void popScope();
     void declare(std::string name, const Value &e);
@@ -60,10 +63,10 @@ public:
     Executor(Env &env);
 
 public:
-    void operator()(const Make &e);
-    void operator()(const Assign &e);
-    void operator()(const ExprStmt &e);
-    void operator()(const If &e);
-    void operator()(const While &e);
-    void operator()(const Ret &e);
+    std::optional<Value> operator()(const Make &e);
+    std::optional<Value> operator()(const Assign &e);
+    std::optional<Value> operator()(const ExprStmt &e);
+    std::optional<Value> operator()(const If &e);
+    std::optional<Value> operator()(const While &e);
+    std::optional<Value> operator()(const Ret &e);
 };

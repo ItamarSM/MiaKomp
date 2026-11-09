@@ -27,17 +27,18 @@ std::string valuetoString(const Value &e)
     return "";
 }
 
-void Env::pushScope()
+void Env::pushFrame()
 {
-    std::unordered_map<std::string, Value> scopeVar{};
-    this->scopeMap.push_back(scopeVar);
+    std::vector<std::unordered_map<std::string, Value>> scopeVar{};
+    this->frameMap.push_back(scopeVar);
+    pushScope();
 }
 
-void Env::popScope()
+void Env::popFrame()
 {
-    if (!this->scopeMap.empty())
+    if (!this->frameMap.empty())
     {
-        this->scopeMap.pop_back();
+        this->frameMap.pop_back();
     }
     else
     {
@@ -45,32 +46,50 @@ void Env::popScope()
     }
 }
 
-void Env::declare(std::string name, const Value &e)
+void Env::pushScope()
 {
-    if (this->globMap.find(name) == this->globMap.end() && !checkKey(this->scopeMap, name))
+    std::unordered_map<std::string, Value> scopeVar{};
+    this->frameMap.back().push_back(scopeVar);
+}
+
+void Env::popScope()
+{
+    if (!this->frameMap.back().empty())
     {
-        if (scopeMap.size() != 0)
-        {
-            scopeMap.back()[name] = e;
-        }
-        else
-        {
-            globMap[name] = e;
-        }
+        this->frameMap.back().pop_back();
     }
     else
     {
+        throw std::runtime_error("Cannot pop from an empty scope");
+    }
+}
+
+void Env::declare(std::string name, const Value &e)
+{
+    if (globMap.end() != globMap.find(name) || (frameMap.size() > 0 && checkKey(frameMap.back(), name)))
+    {
         throw std::runtime_error("Variable name already used");
+    }
+    else if (frameMap.size() > 0)
+    {
+        frameMap.back().back()[name] = e;
+    }
+    else
+    {
+        globMap[name] = e;
     }
 }
 
 Value &Env::lookup(std::string name)
 {
-    for (int i = int(this->scopeMap.size()) - 1; i >= 0; i--)
+    if (frameMap.size() > 0)
     {
-        if (this->scopeMap[i].find(name) != this->scopeMap[i].end())
+        for (int i = int(this->frameMap.back().size()) - 1; i >= 0; i--)
         {
-            return this->scopeMap[i][name];
+            if (this->frameMap.back()[i].find(name) != this->frameMap.back()[i].end())
+            {
+                return this->frameMap.back()[i][name];
+            }
         }
     }
     if (this->globMap.find(name) != this->globMap.end())
@@ -90,6 +109,7 @@ void Env::assign(std::string name, const Value &e)
 
 bool checkKey(const std::vector<std::unordered_map<std::string, Value>> &e, std::string name)
 {
+
     for (int i = int(e.size()) - 1; i >= 0; i--)
     {
         if (e[i].find(name) != e[i].end())
@@ -97,6 +117,7 @@ bool checkKey(const std::vector<std::unordered_map<std::string, Value>> &e, std:
             return true;
         }
     }
+
     return false;
 }
 
@@ -436,22 +457,22 @@ Value Evaluator::operator()(const Call &e)
 
 Executor::Executor(Env &env) : env(env) {}
 
-void Executor::operator()(const Make &e)
+std::optional<Value> Executor::operator()(const Make &e)
 {
-
     env.declare(e.name, std::visit(eval, e.value->kind));
+    return {};
 }
-void Executor::operator()(const Assign &e)
+std::optional<Value> Executor::operator()(const Assign &e)
 {
-
     env.assign(e.name, std::visit(eval, e.value->kind));
+    return {};
 }
-void Executor::operator()(const ExprStmt &e)
+std::optional<Value> Executor::operator()(const ExprStmt &e)
 {
-
     Value a = std::visit(eval, e.expr->kind);
+    return {};
 }
-void Executor::operator()(const If &e)
+std::optional<Value> Executor::operator()(const If &e)
 {
     Value condition = std::visit(eval, e.condition->kind);
     if (!std::holds_alternative<bool>(condition))
@@ -463,7 +484,12 @@ void Executor::operator()(const If &e)
         env.pushScope();
         for (const std::unique_ptr<Stmt> &stmt : e.body)
         {
-            std::visit(*this, stmt->stmt);
+            auto ret = std::visit(*this, stmt->stmt);
+            if (ret.has_value())
+            {
+                env.popScope();
+                return ret;
+            }
         }
         env.popScope();
     }
@@ -472,12 +498,18 @@ void Executor::operator()(const If &e)
         env.pushScope();
         for (const std::unique_ptr<Stmt> &stmt : e.elseBody)
         {
-            std::visit(*this, stmt->stmt);
+            auto ret = std::visit(*this, stmt->stmt);
+            if (ret.has_value())
+            {
+                env.popScope();
+                return ret;
+            }
         }
         env.popScope();
     }
+    return {};
 }
-void Executor::operator()(const While &e)
+std::optional<Value> Executor::operator()(const While &e)
 {
     Value condition = std::visit(eval, e.condition->kind);
     if (!std::holds_alternative<bool>(condition))
@@ -489,13 +521,19 @@ void Executor::operator()(const While &e)
         env.pushScope();
         for (const std::unique_ptr<Stmt> &stmt : e.body)
         {
-            std::visit(*this, stmt->stmt);
+            auto ret = std::visit(*this, stmt->stmt);
+            if (ret.has_value())
+            {
+                env.popScope();
+                return ret;
+            }
         }
         env.popScope();
         condition = std::visit(eval, e.condition->kind);
     }
+    return {};
 }
-void Executor::operator()(const Ret &e)
+std::optional<Value> Executor::operator()(const Ret &e)
 {
-    throw std::runtime_error("not implemented");
+    return std::visit(eval, e.value->kind);
 }
