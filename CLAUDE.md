@@ -459,6 +459,18 @@ together with `docs/syntax.md` for how each feature is spelled.
   (2026-11-09, `checkKey`). Callers bind to the header's old declaration and compile clean; the
   linker then finds no body for it: `LNK2019`, not a compile error. Read the parameter types in
   the mangled name to see which version the caller wanted
+- **A non-owning pointer into a `vector` dies when the vector reallocates** (2026-11-09, the
+  function table). `Env::fnMap` holds `const FnDecl*` into `Program::funcs`; that is safe only
+  because the vector is never modified after registration and `prog` outlives `env`. Growing a
+  vector moves its elements, and every old pointer silently points at nothing (UB, no error).
+  Register through `const FnDecl&` in the loop, never a by-value copy that dies each iteration
+- **Visitor vs free function**: a visitor holds one `operator()` per variant alternative and is
+  only reached through `std::visit`. The top-level entry point (`runProgram`, `printProgram`) is a
+  plain function that *owns* the `Env` as a local and builds the visitors from it, which makes the
+  "`prog` outlives `env`" rule structural
+- Two classes that need each other: one holds the other by value (`Executor` has an `Evaluator`),
+  the other constructs one locally inside a member body (`Executor{env}` in the `Call` overload).
+  Compiles because the `.cpp` sees both full definitions before any body
 
 ### CMake
 - CMake is a **generator**, not a compiler: `cmake -S . -B build` (configure) writes the platform's
@@ -913,3 +925,46 @@ Ladder #4's remaining work, outlined at the start: (1) how `RET` gets out, (2) f
 4. Tests, predict first: `examples/program.miak`; recursive `fact(10)` = `3628800`; a function
    reading `main`'s local exits 1 "Undefined variable"; default `b:int = g` sees `g`'s current
    value; `RET 3;` from `main` → exit 3, measured with `$?`.
+
+### Session 13 — 2026-11-09 — Calls and `runProgram`: ladder #4 complete
+
+- **Step 3, `Call`**: the function table lives in `Env` (`fnMap`: name -> `const FnDecl*`,
+  `declareFn` throws on a duplicate name, `lookupFn` throws on a missing one), because
+  `Evaluator` and `Executor` already share one `Env&`. The call body: look up the function,
+  check the arg count is between the number of non-defaulted params and the total, evaluate args
+  in the caller's frame, `pushFrame`, declare params (an omitted one gets its default evaluated in
+  the new frame), run the body through a local `Executor{env}`, pop and return on `RET`, throw
+  if the body ends without one.
+- **Step 4, `runProgram(const Program&)`**: a free function in `interp.*`, not an `Executor`
+  member (it owns the `Env`; see Multi-file projects). Registers every function, runs global
+  `make`s with no frame pushed, runs `main` in its own frame; a `RET` of a `long long` is the exit
+  code, any other `RET` throws, falling off the end throws. `main.cpp` lexes, parses with
+  `parseProgram()` and returns `runProgram(prog)`; the Session 12 `Env` harness is gone.
+- **Decision recorded in `docs/syntax.md`**: `print` adds nothing, no separator and no trailing
+  newline; a line break is `print("\n");`. The spec example and `examples/example.miak` comments
+  updated to match the real output.
+- Review: `size_t < int` arg-count check (silent on MSVC `/W4`, clang `-Wextra` flags it, same as
+  Session 9); `main`'s `RET` tested "returned *and* is `int`" in one `if`, so `RET 1.5;` was skipped
+  and execution continued (printed the next statement, exit 0); the runtime `catch` in `main.cpp`
+  fell through to `return 0`, so every runtime error exited 0.
+- **Verified**, predictions first, clean `/W4`: `add(3)` with `b:int = a` = 6, `add(3, 4)` = 7;
+  `add()` and `add(1, 2, 3)` exit 1; no-`RET` function exits 1; recursive `fact(10)` = 3628800;
+  a function reading a caller's local exits 1 "Undefined variable"; unknown function exits 1.
+  Whole programs: `RET 3;` -> exit 3; `RET 1.5;` -> exit 1; `1 / 0` -> exit 1; `main` without `RET`
+  -> exit 1; default `b:int = g` gives 11 then 15 after `g = 5` (evaluated per call, as the spec
+  says); `program.miak`, `example.miak` and the spec's example program run as commented, exit 0.
+  Call tests run by Claude in a scratchpad harness; whole-program tests through `miakomp.exe`.
+- `C1041 cannot open program database ... vc143.pdb`: two builds of the same tree at once (the
+  editor and a terminal). Not a code error; wait and rebuild.
+- Commits `770dd82` (calls, `runProgram`, print rule), `e979470` (run a whole program). Pushed.
+
+**Ladder #4, the tree-walking interpreter, is complete**: `.miak` source -> tokens -> `Program`
+-> executed, `main`'s `RET` is the process exit code.
+
+**Immediately next — ladder #5, compile the AST to bytecode for the VM.** Name and outline it at
+the start of next session: read #5's requirements in `compiler-project-exercises.md` first;
+then the gap between `vm.hpp`'s instruction set (Exercise 3: integers, `PUSH`/arith/`JUMP`/
+`CALL`/`RET`, `LOAD`/`STORE`) and what MiaKomp needs (floats, bools, strings, comparisons,
+locals per frame, `print`); then `src/compiler.hpp` + `src/compiler.cpp` as a third visitor over
+the same `Program`. The interpreter's outputs and exit codes above are the oracle the compiled
+programs must reproduce.
