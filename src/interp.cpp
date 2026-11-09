@@ -64,6 +64,30 @@ void Env::popScope()
     }
 }
 
+void Env::declareFn(const FnDecl &fn)
+{
+    if (fnMap.end() == fnMap.find(fn.name))
+    {
+        fnMap[fn.name] = &fn;
+    }
+    else
+    {
+        throw std::runtime_error("function name already used");
+    }
+}
+
+const FnDecl &Env::lookupFn(const std::string name)
+{
+    if (fnMap.end() != fnMap.find(name))
+    {
+        return *fnMap[name];
+    }
+    else
+    {
+        throw std::runtime_error("no such ifunction name");
+    }
+}
+
 void Env::declare(std::string name, const Value &e)
 {
     if (globMap.end() != globMap.find(name) || (frameMap.size() > 0 && checkKey(frameMap.back(), name)))
@@ -452,7 +476,46 @@ Value Evaluator::operator()(const Call &e)
         }
         return std::monostate{};
     }
-    throw std::runtime_error("not implemented");
+    const FnDecl &fn = env.lookupFn(e.name);
+    unsigned int mandatory = 0;
+    for (const Param &p : fn.params)
+    {
+        if (p.value == nullptr)
+        {
+            mandatory++;
+        }
+    }
+    if (e.args.size() < mandatory || e.args.size() > fn.params.size())
+    {
+        throw std::runtime_error("wrong number of args were given");
+    }
+    std::vector<Value> args;
+    for (const std::unique_ptr<Expr> &p : e.args)
+    {
+        args.push_back(std::visit(Evaluator{*this}, p->kind));
+    }
+    env.pushFrame();
+    for (int i = 0; i < int(fn.params.size()); i++)
+    {
+        if (i < int(args.size()))
+        {
+            env.declare(fn.params[i].name, args[i]);
+        }
+        else
+        {
+            env.declare(fn.params[i].name, std::visit(Evaluator{*this}, fn.params[i].value->kind));
+        }
+    }
+    for (const std::unique_ptr<Stmt> &s : fn.body)
+    {
+        auto ret = std::visit(Executor{env}, s->stmt);
+        if (ret.has_value())
+        {
+            env.popFrame();
+            return ret.value();
+        }
+    }
+    throw std::runtime_error("function ended without return");
 }
 
 Executor::Executor(Env &env) : env(env) {}
@@ -536,4 +599,38 @@ std::optional<Value> Executor::operator()(const While &e)
 std::optional<Value> Executor::operator()(const Ret &e)
 {
     return std::visit(eval, e.value->kind);
+}
+
+int runProgram(const Program &prog)
+{
+    Env env;
+    Evaluator eval(env);
+    Executor exec(env);
+
+    for (const FnDecl &fn : prog.funcs)
+    {
+        env.declareFn(fn);
+    }
+    for (const Make &g : prog.globals)
+    {
+        env.declare(g.name, std::visit(eval, g.value->kind));
+    }
+    env.pushFrame();
+    for (const std::unique_ptr<Stmt> &s : prog.mainFunc)
+    {
+        auto ret = std::visit(exec, s->stmt);
+        if (ret.has_value())
+        {
+            env.popFrame();
+            if (std::holds_alternative<long long>(ret.value()))
+            {
+                return int(std::get<long long>(ret.value()));
+            }
+            else
+            {
+                throw std::runtime_error("return type must be int");
+            }
+        }
+    }
+    throw std::runtime_error("must return an int");
 }

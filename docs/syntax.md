@@ -134,6 +134,8 @@ fn checkAddition(a:int, b:int = 5):bool {
 - `print` is a **built-in function**, not a keyword. The lexer sees an identifier followed by `(`,
   and the call is parsed like any other function call.
 - A `bool` prints as `true` / `false`, not `1` / `0`.
+- `print` adds **nothing**: no separator between arguments and no trailing newline. A line break
+  is written explicitly, `print("\n");`. `print(1); print(2);` outputs `12`.
 
 ## Lexical rules
 
@@ -179,10 +181,13 @@ fn checkAddition(a:int, b:int = 5):bool {
 main:int {
     i = 9;
     print(i);                               # 9
+    print("\n");
     make b:bool = checkAddition(i, -6);
     print(b);                               # true
+    print("\n");
     while i <? 15 {
-        print(i);                           # 9 10 11 12 13 14
+        print(i);                           # 9 10 11 12 13 14, one per line
+        print("\n");
         i = i + 1;
     }
     RET 0;
