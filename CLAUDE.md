@@ -326,6 +326,11 @@ together with `docs/syntax.md` for how each feature is spelled.
 - **Code after a throwing call is not cleanup.** Anything in the `try` below the throw is skipped.
   Reset persistent state **on entry**, not on the way out — every `return` added later is a new way
   to skip an exit-cleanup
+- **A broad `catch` catches your own `throw` too.** `TEnv::declare` (2026-11-11) called `lookup`
+  inside a `try`, threw "already used" on success, and `catch (const std::exception&)` caught
+  that as well, so both paths inserted. MSVC flagged it only as C4101 (`e` unreferenced). Don't
+  answer a yes/no question with an exception: a `bool isVisible()` helper, and every throw
+  reaches the caller
 - Uncaught → `std::terminate`: no traceback, no message, just a hex exit code (MSVC: `0xC0000409`)
 - Hierarchy: `std::exception` → `logic_error` → `invalid_argument` / `out_of_range`; also
   `runtime_error`. Catches are tried **first-match, not best-match** — most-derived first
@@ -968,3 +973,47 @@ then the gap between `vm.hpp`'s instruction set (Exercise 3: integers, `PUSH`/ar
 locals per frame, `print`); then `src/compiler.hpp` + `src/compiler.cpp` as a third visitor over
 the same `Program`. The interpreter's outputs and exit codes above are the oracle the compiled
 programs must reproduce.
+
+### Session 14 — 2026-11-11 — Type checker started: `TEnv`
+
+- **Order changed**: the type checker comes before ladder #5. `docs/syntax.md` requires a
+  type-checking pass between the parser and the backends (it was never scheduled), and the
+  bytecode compiler needs each expression's static type to choose between instructions such as
+  `int` and `float` `ADD`.
+- Outline: `src/typechecker.hpp` + `src/typechecker.cpp` (in `add_executable`), entry point
+  `void checkProgram(const Program&)`, throws at the first error, called between `parseProgram()`
+  and `runProgram()`. It mirrors the interpreter with `Type` in place of `Value`: `TEnv` for
+  `Env`, an `Expr -> Type` visitor, a `Stmt -> bool` ("always `RET`s") visitor that is given the
+  function's return type. The 8 rules are in `docs/syntax.md`; build order is expressions, then
+  statements, then calls and the return-path rule. Test: put `print("ran");` before every bad
+  line; a correct check prints nothing and exits 1.
+- **`TEnv` has no frames**: the checker never runs a call and checks each body once, so it needs
+  one stack of scopes. Invariant: `scopeMap` is empty when a function's check starts (push one
+  scope for the params, pop it at the end). That alone makes a caller's local "undefined".
+  No `assign`: a variable's type never changes after `make`, and `x = e;` is a lookup and a compare.
+- Written: `pushScope`, `popScope`, `isVisible` (scopes top-down, then globals), `lookup`,
+  `declare` (throws if visible, else inserts into the top scope or the globals).
+- Review: the first `declare` caught its own "already used" throw, so redeclaring silently
+  succeeded (see Exceptions). Fixed with `isVisible`.
+- **Verified** (run by Claude in a scratchpad harness, one `try` per check): global lookup returns
+  its type; redeclare throws; shadowing a global from a scope throws; lookup after pop throws;
+  sibling redeclare accepted; inner scope sees outer. My own harness in `main.cpp` runs one check
+  and comments out the parser and `runProgram`.
+- Four new open questions added to `docs/syntax.md` (`int` into `float`, the type of `print`,
+  string `+`, `while` and `RET`). Not answered yet.
+- Uncommitted at session end: `CMakeLists.txt`, `src/main.cpp`, `src/typechecker.*`,
+  `docs/syntax.md`, `CLAUDE.md`.
+
+**Open in the code, from the last `--clean-first` build:**
+1. **C4715 in `lookup`**: `if (isVisible) { search } else { throw }` — after the `if` branch the
+   compiler sees a path that falls off the end (UB if it ever happened). Shape it as guard first,
+   then search, with no path left without a `return` or `throw`.
+2. `fnMap` is `unordered_map<string, FnDecl*>`: from a `const Program&` the functions are
+   `const FnDecl&`, so it must hold `const FnDecl*` (C2440 otherwise). `declareFn` and
+   `lookupFn` are not declared yet.
+3. `typechecker.hpp` has no `#pragma once`.
+4. C4100 `p` in the empty `checkProgram` (expected until it has a body).
+
+**Immediately next:** answer the four open questions; fix items 1–3; restore the parser and
+`runProgram` in `main.cpp`; then the expression visitor (`Expr -> Type`), tested with global
+`make`s.

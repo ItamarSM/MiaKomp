@@ -153,7 +153,13 @@ fn checkAddition(a:int, b:int = 5):bool {
 
 Decide these before the stage that needs them:
 
-None open.
+1. Is an `int` accepted where a `float` is declared (`make f:float = 1;`, a `float` parameter,
+   `RET 1;` from a `:float` function)? *(type checker)*
+2. What type is a call to `print`, and how many arguments of which types does it take?
+   `make x:int = print(1);` must be an error or something. *(type checker)*
+3. Is `+` on two `string`s concatenation or an error? *(type checker)*
+4. Does `while true { RET 1; }` count as always returning? The conservative answer (no `while`
+   ever counts) is assumed until decided. *(type checker)*
 
 Answered 2026-11-05: which operand types each comparison takes (see Operators).
 
