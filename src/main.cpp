@@ -3,6 +3,7 @@
 #include "ast.hpp"
 #include "parser.hpp"
 #include "interp.hpp"
+#include "typechecker.hpp"
 #include <fstream>
 #include <sstream>
 
