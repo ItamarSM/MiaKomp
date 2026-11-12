@@ -58,6 +58,12 @@ count = count + 1;
 - Until that pass exists, annotations are parsed and stored, and the interpreter ignores them.
 - **Arithmetic follows C++**: `int / int` is integer division, truncating toward zero (`7 / 2` is
   `3`, `-7 / 2` is `-3`). Mixing `int` and `float` is legal and gives a `float` (`1 + 2.5` is `3.5`).
+- **An `int` widens to `float`, never the other way.** An `int` is accepted wherever a `float` is
+  expected: `make f:float = 1;`, `f = 1;`, an `int` argument for a `float` parameter (or default),
+  `RET 1;` from a `:float` function. The value is **converted**, so `f` holds `1.0` and
+  `f <? 2.5` is legal. A `float` where an `int` is expected is an error.
+- **`string + string` is concatenation** and gives a `string` (`"ab" + "c"` is `"abc"`). `+` on a
+  `string` and any other type is an error, and `-` `*` `/` on strings are errors.
 
 ## Functions
 
@@ -72,6 +78,10 @@ count = count + 1;
   globals and the parameters before it, as bound for this call.
 - `RET value;` returns. `RET` is uppercase.
 - A function that can reach its end without `RET` is a type-check error.
+- A statement **always returns** when it is a `RET`, or an `if` with an `else` where both bodies
+  always return. A body always returns when any of its statements does. A `while` **never** counts,
+  whatever its condition: `while true { RET 1; }` at the end of a function still needs a `RET`
+  after it.
 
 ```
 fn checkAddition(a:int, b:int = 5):bool {
@@ -133,6 +143,9 @@ fn checkAddition(a:int, b:int = 5):bool {
 - `print(value);`
 - `print` is a **built-in function**, not a keyword. The lexer sees an identifier followed by `(`,
   and the call is parsed like any other function call.
+- `print` takes **any number of arguments of any type**, `print()` included, and prints them in order.
+- A call to `print` has **no value**. It may only be used as a statement: `make x:int = print(1);`,
+  `print(print(1));` and `RET print(1);` are type-check errors.
 - A `bool` prints as `true` / `false`, not `1` / `0`.
 - `print` adds **nothing**: no separator between arguments and no trailing newline. A line break
   is written explicitly, `print("\n");`. `print(1); print(2);` outputs `12`.
@@ -151,15 +164,11 @@ fn checkAddition(a:int, b:int = 5):bool {
 
 ## Open questions
 
-Decide these before the stage that needs them:
+None open.
 
-1. Is an `int` accepted where a `float` is declared (`make f:float = 1;`, a `float` parameter,
-   `RET 1;` from a `:float` function)? *(type checker)*
-2. What type is a call to `print`, and how many arguments of which types does it take?
-   `make x:int = print(1);` must be an error or something. *(type checker)*
-3. Is `+` on two `string`s concatenation or an error? *(type checker)*
-4. Does `while true { RET 1; }` count as always returning? The conservative answer (no `while`
-   ever counts) is assumed until decided. *(type checker)*
+Answered 2026-11-12: `int` where a `float` is expected (widens and converts, see Types); the type
+of `print` (any arguments, no value, see Printing); `string + string` (concatenation, see Types);
+`while` and `RET` (a `while` never counts as returning, see Functions).
 
 Answered 2026-11-05: which operand types each comparison takes (see Operators).
 
