@@ -35,6 +35,7 @@ Type TEnv::lookup(std::string name)
     {
         throw std::runtime_error("Cannot find name " + name);
     }
+    throw std::runtime_error("Cannot find name " + name);
 }
 
 bool TEnv::isVisible(std::string name)
@@ -69,6 +70,30 @@ void TEnv::declare(std::string name, Type t)
         {
             globMap[name] = t;
         }
+    }
+}
+
+void TEnv::declareFn(std::string name, const FnDecl &fn)
+{
+    if (fnMap.find(name) == fnMap.end())
+    {
+        fnMap[name] = &fn;
+    }
+    else
+    {
+        throw std::runtime_error("function name alreadu used");
+    }
+}
+
+const FnDecl &TEnv::lookupFn(std::string name)
+{
+    if (fnMap.find(name) != fnMap.end())
+    {
+        return *fnMap[name];
+    }
+    else
+    {
+        throw std::runtime_error("no sich function");
     }
 }
 
