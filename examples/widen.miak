@@ -1,0 +1,19 @@
+make g:float = 1;                          # global make
+
+fn half(x:float):bool { RET x <? 2.5; }    # argument
+fn one():float { RET 1; }                  # RET
+fn dflt(x:float = 1):bool { RET x <? 2.5; }  # default
+
+main:int {
+    print(g <? 2.5);       print("\n");
+    make f:float = 1;
+    print(f <? 2.5);       print("\n");    # local make
+    make a:float = 0.5;
+    a = 3;
+    print(a >? 2.5);       print("\n");    # assignment
+    print(half(1));        print("\n");
+    print(one() <? 2.5);   print("\n");
+    print(dflt());         print("\n");
+    print("ab" + "c" =? "abc"); print("\n");  # concatenation
+    RET 0;
+}

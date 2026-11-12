@@ -255,6 +255,10 @@ Value Evaluator::operator()(const Binary &e)
         {
             return double(std::get<double>(l) + std::get<double>(r));
         }
+        else if (std::holds_alternative<std::string>(l) && std::holds_alternative<std::string>(r))
+        {
+            return std::get<std::string>(l) + std::get<std::string>(r);
+        }
         else
         {
             throw std::runtime_error("Operand types must be int/float");
@@ -490,9 +494,15 @@ Value Evaluator::operator()(const Call &e)
         throw std::runtime_error("wrong number of args were given");
     }
     std::vector<Value> args;
-    for (const std::unique_ptr<Expr> &p : e.args)
+    for (int i = 0; i < int(e.args.size()); i++)
     {
-        args.push_back(std::visit(Evaluator{*this}, p->kind));
+        const std::unique_ptr<Expr> &p = e.args[i];
+        Value pVal = std::visit(Evaluator{*this}, p->kind);
+        if (fn.params[i].type == Type::FLOAT && std::holds_alternative<long long>(pVal))
+        {
+            pVal = double(std::get<long long>(pVal));
+        }
+        args.push_back(pVal);
     }
     env.pushFrame();
     for (int i = 0; i < int(fn.params.size()); i++)
@@ -503,7 +513,12 @@ Value Evaluator::operator()(const Call &e)
         }
         else
         {
-            env.declare(fn.params[i].name, std::visit(Evaluator{*this}, fn.params[i].value->kind));
+            Value defVal = std::visit(Evaluator{*this}, fn.params[i].value->kind);
+            if (fn.params[i].type == Type::FLOAT && std::holds_alternative<long long>(defVal))
+            {
+                defVal = double(std::get<long long>(defVal));
+            }
+            env.declare(fn.params[i].name, defVal);
         }
     }
     for (const std::unique_ptr<Stmt> &s : fn.body)
@@ -512,6 +527,10 @@ Value Evaluator::operator()(const Call &e)
         if (ret.has_value())
         {
             env.popFrame();
+            if (fn.retType == Type::FLOAT && std::holds_alternative<long long>(ret.value()))
+            {
+                ret = double(std::get<long long>(ret.value()));
+            }
             return ret.value();
         }
     }
@@ -522,12 +541,22 @@ Executor::Executor(Env &env) : env(env) {}
 
 std::optional<Value> Executor::operator()(const Make &e)
 {
-    env.declare(e.name, std::visit(eval, e.value->kind));
+    Value val = std::visit(eval, e.value->kind);
+    if (e.type == Type::FLOAT && std::holds_alternative<long long>(val))
+    {
+        val = double(std::get<long long>(val));
+    }
+    env.declare(e.name, val);
     return {};
 }
 std::optional<Value> Executor::operator()(const Assign &e)
 {
-    env.assign(e.name, std::visit(eval, e.value->kind));
+    Value newVal = std::visit(eval, e.value->kind);
+    if (std::holds_alternative<double>(env.lookup(e.name)) && std::holds_alternative<long long>(newVal))
+    {
+        newVal = double(std::get<long long>(newVal));
+    }
+    env.assign(e.name, newVal);
     return {};
 }
 std::optional<Value> Executor::operator()(const ExprStmt &e)
@@ -613,7 +642,12 @@ int runProgram(const Program &prog)
     }
     for (const Make &g : prog.globals)
     {
-        env.declare(g.name, std::visit(eval, g.value->kind));
+        Value glob = std::visit(eval, g.value->kind);
+        if (g.type == Type::FLOAT && std::holds_alternative<long long>(glob))
+        {
+            glob = double(std::get<long long>(glob));
+        }
+        env.declare(g.name, glob);
     }
     env.pushFrame();
     for (const std::unique_ptr<Stmt> &s : prog.mainFunc)
