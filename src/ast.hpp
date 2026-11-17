@@ -94,7 +94,8 @@ enum class Type
     INT,
     FLOAT,
     BOOL,
-    STRING
+    STRING,
+    VOID
 };
 
 struct Make

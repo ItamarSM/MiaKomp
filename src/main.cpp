@@ -146,22 +146,6 @@ public:
     }
 };
 
-std::string typeToString(Type type)
-{
-    switch (type)
-    {
-    case Type::BOOL:
-        return "bool";
-    case Type::FLOAT:
-        return "float";
-    case Type::INT:
-        return "int";
-    case Type::STRING:
-        return "string";
-    }
-    throw std::runtime_error("type not defined");
-}
-
 class StmtPrinter
 {
 public:
@@ -342,6 +326,7 @@ int main(int argc, char *argv[])
     int retVal;
     try
     {
+        checkProgram(prog);
         retVal = runProgram(prog);
         return retVal;
     }
