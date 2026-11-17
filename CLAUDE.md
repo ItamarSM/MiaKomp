@@ -1017,3 +1017,51 @@ programs must reproduce.
 **Immediately next:** answer the four open questions; fix items 1–3; restore the parser and
 `runProgram` in `main.cpp`; then the expression visitor (`Expr -> Type`), tested with global
 `make`s.
+
+### Session 15 — 2026-11-17 — Type checker complete
+
+- Between sessions (`8577f3b`..`d37bf0d`): the four open questions answered in `docs/syntax.md`
+  (`int` widens to `float` and is converted; `print` takes anything and has no value; `string +
+  string`; a `while` never counts as returning). Session 14's items 1–3 fixed. The interpreter
+  converts `int` to `float` on `make`, assignment and arguments (verified: `f / 2` = `0.5`).
+- `Type::VOID` added to `ast.hpp` as the type of a `print` call; `typeToString` moved from
+  `main.cpp` into `typechecker.*`.
+- **`ExprChecker`** (`Expr -> Type`): literals, `Var` via `lookup`, `Unary`, `Binary`
+  (int/float widening, `int / int` stays `int`, `string + string`), `Compare` (every pair of a
+  chain; `=?`/`!=?` same type and not `VOID`; ordering only `int`/`int` or `float`/`float`),
+  `Call` (`print` visits every argument and rejects `VOID`; user functions: `lookupFn`, arg
+  count between required and total, each arg `assignable` to its param, returns `retType`).
+- **`StmtChecker`** (`Stmt -> bool`, "always `RET`s"): members `TEnv&`, `ExprChecker&`,
+  `Type retType` (a visitor's `operator()` takes exactly one node, so extra context is a member).
+  `Make` checks before `declare`; `If` = `then && else`; `While` always `false`; `Ret` `true`.
+  `retbody` = push, visit all, pop, "any". `assignable(target, value)` = equal, or `FLOAT` <- `INT`.
+- **`checkProgram`**: register functions; globals with `retType` `VOID`; per function push a
+  parameter scope, check each default then `declare` the param, `retbody`, throw if it can end
+  without `RET`, pop; `main` the same with `Type::INT`. Called in `main.cpp` between
+  `parseProgram()` and `runProgram()`.
+- Review loop, in order: `&&`/`||` precedence in `Compare` (bools and strings could be ordered;
+  silent at `/W4`); `if (lt == rt) throw` inverted in the chain loop (every 3-operand chain
+  rejected); `print` never visited its args (`print(nope)` passed); `"..." + i` pointer
+  arithmetic in an error message (`nnot print...`); `Ret` overload with a second parameter
+  (C2672 inside `<variant>`); `std::visit` on a `Make` (not a variant); a temporary
+  `ExprChecker{tenv}` bound to `ExprChecker&`; param loop indexing `fn.body[i]`; `FnDecl fn =`
+  copy (C2280); arg-count upper bound compared `nodefault` instead of `params.size()` (every
+  call to a no-default function rejected, too many args read past `params`); the parameter
+  scope's push/pop removed instead of restored (params leaked into the globals: "already used").
+- `examples/add.miak` had `main() : int` — `main` takes no parentheses (parse error).
+- **Verified**, clean `--clean-first` at `/W4`, 0 warnings: 13-case expression table, 9 global
+  `make` cases, 13 whole-program cases (bad `RET` type, no `RET`, undefined/self-referencing
+  default, redeclared param, `if` without `else`, `while true`, `main` without `RET`, another
+  function's param, `if 5`), all as the spec requires (run by Claude in a scratchpad harness).
+  Through `miakomp.exe`: call table (`add(1)` 6, `add(1, 2)` 3, too few / too many / `add(1.5)`
+  / unknown function / `int` into `bool` exit 1, `int` into `float` accepted);
+  `add.miak`, `program.miak`, `example.miak` run with their Session 13 output, exit 0.
+- Commit `a1faa90` (expressions, statements, functions). The `Call` check and `add.miak` were
+  uncommitted at the end of the session.
+
+**Immediately next — ladder #5, compile the AST to bytecode.** Unchanged from Session 13's plan:
+read #5 in `compiler-project-exercises.md`, map the gap between `vm.hpp`'s instruction set and
+MiaKomp (floats, bools, strings, comparisons, locals per frame, `print`), then
+`src/compiler.hpp` + `src/compiler.cpp` as a visitor over the *checked* `Program`. The checker
+now knows every expression's static type, which is what picks `int` vs `float` instructions.
+The interpreter's outputs and exit codes are the oracle.
