@@ -1,0 +1,9 @@
+fn add(a:int, b:int = 5) : int {
+    RET a + b;
+}
+
+main : int{
+    make c :int = add(1000000);
+    print(c);
+    RET 0;
+}

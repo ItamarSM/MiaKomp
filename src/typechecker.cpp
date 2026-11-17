@@ -304,10 +304,27 @@ Type ExprChecker::operator()(const Call &e)
         }
         return Type::VOID;
     }
-    else
+    const FnDecl &fn = tenv.lookupFn(e.name);
+    int nodefault = 0;
+    for (const Param &p : fn.params)
     {
-        throw std::runtime_error("not implemented");
+        if (p.value == nullptr)
+        {
+            nodefault++;
+        }
     }
+    if (int(e.args.size()) < nodefault || e.args.size() > fn.params.size())
+    {
+        throw std::runtime_error("wrong number of arguments");
+    }
+    for (int i = 0; i < int(e.args.size()); i++)
+    {
+        if (!assignable(fn.params[i].type, std::visit(*this, e.args[i]->kind)))
+        {
+            throw std::runtime_error("wrong argument types were given");
+        }
+    }
+    return fn.retType;
 }
 
 bool isNumeric(Type t)
